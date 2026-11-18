@@ -163,12 +163,6 @@ export function LoginPage(): React.JSX.Element {
 
           <h1 className="text-[24px] font-semibold tracking-[-0.02em] text-ink">登录控制台</h1>
           <p className="mt-1.5 text-[12.5px] text-muted">使用管理员账号继续，所有敏感操作都会被记录。</p>
-          {meta?.production ? (
-            <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-[10.5px] text-muted">
-              <ShieldCheck size={11} className="text-brand" />
-              生产环境 · 演示数据已关闭
-            </div>
-          ) : null}
 
           <form onSubmit={submit} className="mt-7 space-y-4">
             <div>
