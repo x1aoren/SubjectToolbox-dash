@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { statSync } from 'node:fs'
 import { requirePermission, requireUser, issueApiKey, validateApiKey } from '../auth.js'
 import { DB_PATH, DATA_DIR, db, getSettings, nowIso, tx } from '../db.js'
+import { IS_PRODUCTION } from '../env.js'
 import { audit, clampText, fail } from '../http.js'
 import { seedDatabase } from '../seed.js'
 import { TOOLS, TOOL_BY_ID, RELEASES, SUBJECTS, CHANNELS } from '../catalog.js'
@@ -332,6 +333,8 @@ export async function systemRoutes(app: FastifyInstance): Promise<void> {
     }
   })
   app.post('/api/system/reset-demo', async (request) => {
+    // 生产环境不允许重建演示数据（契约第 3 节）
+    if (IS_PRODUCTION) fail(403, 'not_available', '生产环境不允许重建演示数据')
     const user = requirePermission(request, 'keys.manage')
     const body = (request.body ?? {}) as { confirm?: string }
     if (body.confirm !== 'RESET') fail(400, 'confirm_required', '请输入 RESET 确认重置演示数据')

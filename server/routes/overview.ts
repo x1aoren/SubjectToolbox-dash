@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { db } from '../db.js'
 import { requirePermission } from '../auth.js'
 import { parseRange, todayRange, trailingDays } from '../http.js'
-import { SUBJECTS, TOOLS, TOOL_BY_ID } from '../catalog.js'
+import { PRIMARY_TOOLS, SUBJECTS, TOOL_BY_ID } from '../catalog.js'
 
 const DAY_MS = 86_400_000
 
@@ -193,10 +193,15 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
     )
     const prevOpenMap = new Map(toolOpensPrev.map((row) => [row.tool_id, num(row.opens)]))
     const errorToolMap = new Map(toolErrors.map((row) => [row.tool_id, num(row.n)]))
-    const totalToolOpens = toolOpens.reduce((sum, row) => sum + num(row.opens), 0)
+    const openByTool = new Map(toolOpens.map((row) => [row.tool_id, row]))
+    // 工具排行/工具元数据只统计主工具（子工具、功能入口不计入，见契约第 1 节）
+    const primaryToolIds = new Set(PRIMARY_TOOLS.map((tool) => tool.id))
+    const totalToolOpens = toolOpens
+      .filter((row) => primaryToolIds.has(row.tool_id))
+      .reduce((sum, row) => sum + num(row.opens), 0)
 
-    const tools = TOOLS.map((tool) => {
-      const row = toolOpens.find((entry) => entry.tool_id === tool.id)
+    const tools = PRIMARY_TOOLS.map((tool) => {
+      const row = openByTool.get(tool.id)
       const opens = num(row?.opens)
       return {
         toolId: tool.id,
@@ -362,7 +367,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
       topErrors,
       recentFeedback,
       activity,
-      toolMeta: TOOLS.map((tool) => ({
+      toolMeta: PRIMARY_TOOLS.map((tool) => ({
         id: tool.id,
         title: tool.title,
         subjectId: tool.subjectId,

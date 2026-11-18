@@ -291,6 +291,13 @@ export const CHANNEL_LABELS: Record<string, string> = {
   beta: '内测版',
 }
 
+/** 工具类型徽章：主工具不展示，示意图 / 功能入口需要在后台标注 */
+export const TOOL_KIND_META: Record<string, { label: string; tone: Tone }> = {
+  tool: { label: '工具', tone: 'neutral' },
+  diagram: { label: '示意图', tone: 'violet' },
+  feature: { label: '功能入口', tone: 'blue' },
+}
+
 export const ANNOUNCEMENT_LEVELS: Record<string, { label: string; tone: Tone }> = {
   info: { label: '通知', tone: 'blue' },
   warning: { label: '提醒', tone: 'amber' },

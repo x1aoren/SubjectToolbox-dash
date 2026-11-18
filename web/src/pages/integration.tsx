@@ -26,6 +26,17 @@ import {
 
 const METHOD_TONE = { GET: 'blue', POST: 'brand' } as const
 
+interface IntegrationEndpoint {
+  id: string
+  method: 'GET' | 'POST'
+  path: string
+  title: string
+  description: string
+  code: string
+  /** 个别接口附带的响应示例（节选） */
+  sample?: string
+}
+
 export function IntegrationPage(): React.JSX.Element {
   const { data, loading } = useApi<IntegrationInfo>('/api/integration')
 
@@ -46,7 +57,7 @@ export function IntegrationPage(): React.JSX.Element {
   const base = data.apiBase
   const key = '$STB_KEY'
 
-  const endpoints = [
+  const endpoints: IntegrationEndpoint[] = [
     {
       id: 'handshake',
       method: 'POST' as const,
@@ -121,9 +132,38 @@ export function IntegrationPage(): React.JSX.Element {
       path: '/v1/config',
       title: '拉取云端配置',
       description:
-        '不修改设备状态，可用于定时刷新。返回可用的工具列表、未过期的公告、版本策略与功能开关。',
+        '不修改设备状态，可用于定时刷新。返回可用的工具列表、未过期的公告、版本策略与功能开关。被停用的工具 enabled=false，并带上已解析好的 disabledReason。',
       code: `curl "${base}/v1/config?version=1.1.0&channel=stable&sn=SN-8F3A2C91D4B6" \\
   -H "X-STB-Key: ${key}"`,
+      sample: `{
+  "version": 3,
+  "channel": "stable",
+  "clientVersion": "1.1.0",
+  "tools": {
+    "biology.diagram.cell-division": {
+      "enabled": false,
+      "source": "global",
+      "disabledReason": "课堂演示告一段落，下周恢复",
+      "disabledReasonSource": "global"
+    },
+    "other.feedback": {
+      "enabled": false,
+      "source": "device",
+      "reason": "device_disabled",
+      "disabledReason": "本机正在考试环境，反馈入口暂时关闭",
+      "disabledReasonSource": "device"
+    },
+    "chinese.poetry": { "enabled": true, "source": "global" }
+  },
+  "announcements": [],
+  "features": {},
+  "sync": {
+    "configIntervalSeconds": 900,
+    "telemetryFlushIntervalSeconds": 300,
+    "telemetryBatchMax": 500,
+    "nextConfigAt": "2026-11-18T08:00:00.000Z"
+  }
+}`,
     },
     {
       id: 'feedback',
@@ -221,8 +261,60 @@ curl "${base}/v1/health" -H "X-STB-Key: ${key}"
                 <CopyButton text={endpoint.code} label="复制示例" />
               </div>
               <pre className="code-block mx-5 mb-5 mt-3 max-h-[300px]">{endpoint.code}</pre>
+              {endpoint.sample ? (
+                <div className="-mt-2 mx-5 mb-5">
+                  <div className="mb-1 text-[10.5px] font-medium text-faint">响应示例（节选）</div>
+                  <pre className="code-block max-h-[340px]">{endpoint.sample}</pre>
+                </div>
+              ) : null}
             </Card>
           ))}
+
+          <Card>
+            <CardHeader
+              title="停用原因与破坏性变更"
+              description="全局 + 单设备两级停用原因，全局原因统一走 disabledReason；v2 不保留旧字段兼容"
+              action={<ShieldCheck size={15} className="text-faint" />}
+            />
+            <div className="px-5 pb-5 pt-3">
+              <div className="space-y-2.5 text-[11.5px] leading-5 text-muted">
+                <p>
+                  · <span className="text-ink">全局停用原因</span>：在「云端控制 → 工具开关」的「停用原因（全局）」填写，
+                  发布后对该版本 / 渠道的所有设备生效（最长 120 字）。
+                </p>
+                <p>
+                  · <span className="text-ink">单设备停用原因</span>：在设备详情的「停用原因（本设备）」里填写，只覆盖该设备；
+                  留空则回退到全局原因。内部备注 <code className="font-mono text-[10.5px]">note</code> 永远不会下发给客户端。
+                </p>
+                <p>
+                  · 下发字段 <code className="font-mono text-[10.5px]">disabledReason</code> 已由服务端按「单设备原因 &gt;
+                  全局原因 &gt; 客户端默认文案」解析，<code className="font-mono text-[10.5px]">disabledReasonSource</code>
+                  （<code className="font-mono text-[10.5px]">device</code> /{' '}
+                  <code className="font-mono text-[10.5px]">global</code>）标明文本来源；已启用的工具不下发该字段。
+                </p>
+                <p>
+                  · <span className="text-ink">破坏性变更（v2）</span>：后台与客户端 1.1.0 均未上线，因此不保留旧字段兼容。
+                  <code className="font-mono text-[10.5px]">/v1/config</code> 的{' '}
+                  <code className="font-mono text-[10.5px]">tools[toolId].message</code> 已删除，后台配置草稿 / 已发布配置的{' '}
+                  <code className="font-mono text-[10.5px]">ToolConfig</code> 也不再包含{' '}
+                  <code className="font-mono text-[10.5px]">message</code>；全局停用原因统一写入{' '}
+                  <code className="font-mono text-[10.5px]">disabledReason</code>。客户端需按 v2 字段解析，不再有旧字段回退。
+                </p>
+                <p>
+                  · <span className="text-ink">停用不隐藏</span>：客户端不再把被停用的工具从主页移除，而是在原位置灰并标注「已停用」，
+                  点击后弹窗展示停用原因；单设备原因会额外标注「仅本设备」。
+                </p>
+              </div>
+              <pre className="code-block mt-3">{`// 给某台设备单独填写停用原因（后台管理接口，需登录会话）
+PUT /api/devices/SN-8F3A2C91D4B6/overrides
+{
+  "toolId": "other.feedback",
+  "enabled": false,
+  "reason": "本机正在考试环境，反馈入口暂时关闭",
+  "note": "内部备注，不会下发给客户端"
+}`}</pre>
+            </div>
+          </Card>
 
           <Card>
             <CardHeader

@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 dist/
 data/*.db
 data/*.db-journal
@@ -10,3 +10,5 @@ data/seed-credentials.txt
 *.log
 .DS_Store
 .vscode/
+data/initial-admin.txt
+data/initial-client-key.txt

@@ -7,6 +7,7 @@ import {
   CHANNEL_LABELS,
   SUBJECT_COLORS,
   SUBJECT_NAMES,
+  TOOL_KIND_META,
 } from '../lib/format'
 import type { RemoteConfig } from '../lib/types'
 import { PublishDialog, SaveBar } from '../components/publish-dialog'
@@ -23,7 +24,7 @@ import {
 
 export function ControlToolsPage(): React.JSX.Element {
   const { can } = useAuth()
-  const { catalog } = useCatalog()
+  const { toolById } = useCatalog()
   const { toast } = useToast()
   const { payload, draft, setDraft, dirty, saving, save, reset, reload, loading } = useDraftConfig()
   const [publishOpen, setPublishOpen] = useState(false)
@@ -74,7 +75,7 @@ export function ControlToolsPage(): React.JSX.Element {
         <div>
           <h1 className="text-[23px] font-semibold leading-tight tracking-[-0.02em] text-ink">工具开关</h1>
           <p className="mt-1 text-[12.5px] text-muted">
-            停用的工具会在客户端主页隐藏；低于最低版本的设备会收到提示。
+            停用的工具在客户端仍会显示（置灰并标注已停用），点击会弹出停用原因；低于最低版本的设备会收到提示。
             <span className="ml-1 text-ink">
               当前启用 {enabledCount} / {draft.tools.length}
             </span>
@@ -109,7 +110,7 @@ export function ControlToolsPage(): React.JSX.Element {
       <Card className="overflow-hidden">
         <CardHeader
           title="逐工具控制"
-          description="开关只影响云端下发的可见性，不会删除客户端已缓存的内容"
+          description="开关只影响客户端的可用状态，不会删除客户端已缓存的内容；停用的工具仍会在原位显示"
           action={
             canEdit ? (
               <div className="flex items-center gap-1.5">
@@ -131,19 +132,21 @@ export function ControlToolsPage(): React.JSX.Element {
         />
 
         <div className="overflow-x-auto">
-          <table className="table min-w-[960px]">
+          <table className="table min-w-[1040px]">
             <thead>
               <tr>
-                <th className="w-[248px]">工具</th>
+                <th className="w-[268px]">工具</th>
                 <th className="w-[110px]">状态</th>
                 <th className="w-[150px]">最低版本</th>
                 <th className="w-[190px]">下发渠道</th>
-                <th>客户端提示文案</th>
+                <th>停用原因（全局）</th>
               </tr>
             </thead>
             <tbody>
               {draft.tools.map((tool) => {
-                const meta = catalog?.tools.find((item) => item.id === tool.toolId)
+                const meta = toolById.get(tool.toolId)
+                const parent = meta?.parentId ? toolById.get(meta.parentId) : undefined
+                const kindMeta = TOOL_KIND_META[meta?.kind ?? 'tool'] ?? TOOL_KIND_META.tool!
                 const accent = SUBJECT_COLORS[meta?.subjectId ?? 'other'] ?? 'var(--brand)'
                 return (
                   <tr key={tool.toolId} className={cn(!tool.enabled && 'opacity-60')}>
@@ -159,13 +162,21 @@ export function ControlToolsPage(): React.JSX.Element {
                           {meta?.glyph ?? '·'}
                         </span>
                         <div className="min-w-0">
-                          <div className="truncate text-[12.5px] font-medium text-ink">
-                            {meta?.title ?? tool.toolId}
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <div className="truncate text-[12.5px] font-medium text-ink">
+                              {parent ? <span className="text-muted">{parent.title} › </span> : null}
+                              {meta?.title ?? tool.toolId}
+                            </div>
+                            {meta?.kind && meta.kind !== 'tool' ? (
+                              <Badge tone={kindMeta.tone} className="shrink-0">
+                                {kindMeta.label}
+                              </Badge>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-1 text-[10px] text-faint">
                             <span>{SUBJECT_NAMES[meta?.subjectId ?? 'other']}</span>
                             <span>·</span>
-                            <span className="font-mono">{tool.toolId}</span>
+                            <span className="truncate font-mono">{tool.toolId}</span>
                           </div>
                         </div>
                       </div>
@@ -216,10 +227,13 @@ export function ControlToolsPage(): React.JSX.Element {
                     </td>
                     <td>
                       <Input
-                        value={tool.message}
+                        value={tool.disabledReason ?? ''}
                         disabled={!canEdit}
-                        onChange={(event) => updateTool(tool.toolId, { message: event.target.value })}
-                        placeholder="留空则不显示提示"
+                        onChange={(event) =>
+                          updateTool(tool.toolId, { disabledReason: event.target.value })
+                        }
+                        placeholder="留空则使用客户端默认文案"
+                        title="留空则使用客户端默认文案（学校管理员暂时关闭了这个工具）"
                         className="h-8 text-[11.5px]"
                         maxLength={120}
                       />

@@ -1,10 +1,14 @@
 import { db, nowIso } from './db.js'
 import { TOOL_BY_ID } from './catalog.js'
+import { DISABLED_REASON_MAX } from './config-domain.js'
 
 export interface DeviceOverride {
   toolId: string
   enabled: boolean
+  /** 内部备注，永不下发给客户端。 */
   note: string
+  /** 单设备停用原因（用户可见），空串表示未填。 */
+  reason: string
   updatedBy: string
   updatedAt: string
 }
@@ -12,13 +16,14 @@ export interface DeviceOverride {
 export function overrideRows(sn: string): DeviceOverride[] {
   const rows = db()
     .prepare(
-      `SELECT tool_id, enabled, note, updated_by_name, updated_at
+      `SELECT tool_id, enabled, note, reason, updated_by_name, updated_at
        FROM device_tool_overrides WHERE sn = ? ORDER BY tool_id`,
     )
     .all(sn) as Array<{
     tool_id: string
     enabled: number
     note: string
+    reason: string | null
     updated_by_name: string
     updated_at: string
   }>
@@ -26,13 +31,25 @@ export function overrideRows(sn: string): DeviceOverride[] {
     toolId: row.tool_id,
     enabled: row.enabled === 1,
     note: row.note,
+    reason: row.reason ?? '',
     updatedBy: row.updated_by_name,
     updatedAt: row.updated_at,
   }))
 }
 
-export function overrideMap(sn: string): Map<string, { enabled: boolean; note: string }> {
-  return new Map(overrideRows(sn).map((row) => [row.toolId, { enabled: row.enabled, note: row.note }]))
+export function overrideMap(
+  sn: string,
+): Map<string, { enabled: boolean; note: string; reason: string }> {
+  return new Map(
+    overrideRows(sn).map((row) => [
+      row.toolId,
+      { enabled: row.enabled, note: row.note, reason: row.reason },
+    ]),
+  )
+}
+
+export function clampReason(value: unknown): string {
+  return typeof value === 'string' ? value.trim().slice(0, DISABLED_REASON_MAX) : ''
 }
 
 export function setOverride(input: {
@@ -40,6 +57,7 @@ export function setOverride(input: {
   toolId: string
   enabled: boolean | null
   note: string
+  reason: string
   userId: string
   userName: string
 }): void {
@@ -55,16 +73,26 @@ export function setOverride(input: {
   }
   db()
     .prepare(
-      `INSERT INTO device_tool_overrides(sn, tool_id, enabled, note, updated_by, updated_by_name, updated_at)
-       VALUES(?,?,?,?,?,?,?)
+      `INSERT INTO device_tool_overrides(sn, tool_id, enabled, note, reason, updated_by, updated_by_name, updated_at)
+       VALUES(?,?,?,?,?,?,?,?)
        ON CONFLICT(sn, tool_id) DO UPDATE SET
          enabled = excluded.enabled,
          note = excluded.note,
+         reason = excluded.reason,
          updated_by = excluded.updated_by,
          updated_by_name = excluded.updated_by_name,
          updated_at = excluded.updated_at`,
     )
-    .run(input.sn, input.toolId, input.enabled ? 1 : 0, input.note, input.userId, input.userName, nowIso())
+    .run(
+      input.sn,
+      input.toolId,
+      input.enabled ? 1 : 0,
+      input.note,
+      clampReason(input.reason),
+      input.userId,
+      input.userName,
+      nowIso(),
+    )
 }
 
 export function clearOverrides(sn: string): number {

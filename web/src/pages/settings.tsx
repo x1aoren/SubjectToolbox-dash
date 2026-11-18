@@ -47,18 +47,20 @@ import {
 const AVATAR_COLORS = ['#3F6E5A', '#34558B', '#6B4A8F', '#9A6B1F', '#2E7D6F', '#546E7A', '#9C4438']
 
 export function SettingsPage(): React.JSX.Element {
-  const { user, can } = useAuth()
+  const { user, can, meta } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const isOwner = user?.role === 'owner'
+  const isProduction = meta?.production === true
   const tabs = useMemo(
     () => [
       { key: 'profile', label: '个人资料' },
       { key: 'security', label: '安全' },
       ...(can('settings.manage') ? [{ key: 'system', label: '系统设置' }] : []),
       ...(can('keys.manage') ? [{ key: 'keys', label: '接入密钥' }] : []),
-      ...(isOwner ? [{ key: 'demo', label: '演示数据' }] : []),
+      // 生产环境不提供演示数据入口，整个 DemoSection 不可达
+      ...(isOwner && !isProduction ? [{ key: 'demo', label: '演示数据' }] : []),
     ],
-    [can, isOwner],
+    [can, isOwner, isProduction],
   )
   const requested = searchParams.get('tab') ?? 'profile'
   const tab = tabs.some((item) => item.key === requested) ? requested : 'profile'
@@ -67,7 +69,11 @@ export function SettingsPage(): React.JSX.Element {
     <div className="animate-fade-in">
       <div className="mb-5">
         <h1 className="text-[23px] font-semibold leading-tight tracking-[-0.02em] text-ink">设置</h1>
-        <p className="mt-1 text-[12.5px] text-muted">控制台账号、采集策略、接入密钥与演示数据</p>
+        <p className="mt-1 text-[12.5px] text-muted">
+          {isProduction
+            ? '控制台账号、采集策略与接入密钥'
+            : '控制台账号、采集策略、接入密钥与演示数据'}
+        </p>
       </div>
 
       <Tabs
@@ -81,7 +87,7 @@ export function SettingsPage(): React.JSX.Element {
       {tab === 'security' ? <SecuritySection /> : null}
       {tab === 'system' ? <SystemSection /> : null}
       {tab === 'keys' ? <KeysSection /> : null}
-      {tab === 'demo' ? <DemoSection /> : null}
+      {!isProduction && tab === 'demo' ? <DemoSection /> : null}
     </div>
   )
 }

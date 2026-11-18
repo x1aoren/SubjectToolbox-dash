@@ -1,17 +1,21 @@
 import { createHash } from 'node:crypto'
 import { fail } from './http.js'
-import { TOOL_BY_ID } from './catalog.js'
+import { TOOLS, TOOL_BY_ID } from './catalog.js'
 
 /* ------------------------------------------------------------------ */
 /* 远程配置的数据结构                                                   */
 /* ------------------------------------------------------------------ */
+
+/** 全局停用原因的最大长度（超长截断，不报错）。 */
+export const DISABLED_REASON_MAX = 120
 
 export interface ToolConfig {
   toolId: string
   enabled: boolean
   minVersion: string
   channels: string[]
-  message: string
+  /** 全局停用原因文案（0–120 字，默认 ''）。 */
+  disabledReason: string
 }
 
 export interface Announcement {
@@ -84,6 +88,22 @@ function channels(value: unknown): string[] {
   return filtered.length > 0 ? Array.from(new Set(filtered)) : ['stable']
 }
 
+/** 目录里存在但配置里缺失的工具，统一补这一份默认条目。 */
+export function defaultToolConfig(toolId: string): ToolConfig {
+  return {
+    toolId,
+    enabled: true,
+    minVersion: '1.0.0',
+    channels: ['stable', 'beta'],
+    disabledReason: '',
+  }
+}
+
+function clampDisabledReason(value: unknown): string {
+  const text = str(value)
+  return text.length > DISABLED_REASON_MAX ? text.slice(0, DISABLED_REASON_MAX) : text
+}
+
 export function validateConfig(input: unknown): RemoteConfig {
   if (!isRecord(input)) fail(400, 'invalid_config', '配置必须是一个 JSON 对象')
   const maintenanceRaw = isRecord(input.maintenance) ? input.maintenance : {}
@@ -94,29 +114,28 @@ export function validateConfig(input: unknown): RemoteConfig {
   if (!Array.isArray(input.announcements)) fail(400, 'invalid_config', 'announcements 必须是数组')
   if (!Array.isArray(input.features)) fail(400, 'invalid_config', 'features 必须是数组')
 
-  const tools: ToolConfig[] = input.tools.map((entry, index) => {
+  const providedTools = new Map<string, ToolConfig>()
+  input.tools.forEach((entry, index) => {
     if (!isRecord(entry)) fail(400, 'invalid_config', `tools[${index}] 不是对象`)
     const toolId = str(entry.toolId)
     if (!toolId) fail(400, 'invalid_config', `tools[${index}] 缺少 toolId`)
-    return {
+    if (!TOOL_BY_ID.has(toolId)) {
+      fail(400, 'invalid_config', `未知工具：${toolId}（必须与 STB 注册表一致）`)
+    }
+    if (providedTools.has(toolId)) fail(400, 'invalid_config', 'tools 里有重复的 toolId')
+    providedTools.set(toolId, {
       toolId,
       enabled: bool(entry.enabled, true),
       minVersion: str(entry.minVersion, '1.0.0'),
       channels: channels(entry.channels),
-      message: str(entry.message),
-    }
+      disabledReason: clampDisabledReason(entry.disabledReason),
+    })
   })
-  const toolIds = new Set(tools.map((tool) => tool.toolId))
-  if (toolIds.size !== tools.length) fail(400, 'invalid_config', 'tools 里有重复的 toolId')
-  for (const tool of tools) {
-    if (!TOOL_BY_ID.has(tool.toolId)) {
-      fail(400, 'invalid_config', `未知工具：${tool.toolId}（必须与 STB 注册表一致）`)
-    }
-  }
-  const missingTools = [...TOOL_BY_ID.keys()].filter((id) => !toolIds.has(id))
-  if (missingTools.length > 0) {
-    fail(400, 'invalid_config', `tools 缺少 STB 工具：${missingTools.join(', ')}`)
-  }
+  // 目录里存在但配置里缺失的工具按目录顺序自动补默认条目（不再报 400）。
+  // 返回顺序 = 目录顺序（主工具 11 + 子工具/功能入口 3）。
+  const tools: ToolConfig[] = TOOLS.map(
+    (tool) => providedTools.get(tool.id) ?? defaultToolConfig(tool.id),
+  )
 
   const announcements: Announcement[] = input.announcements.map((entry, index) => {
     if (!isRecord(entry)) fail(400, 'invalid_config', `announcements[${index}] 不是对象`)
@@ -368,6 +387,21 @@ export const CLIENT_POLICY = {
 export interface ToolOverrideState {
   enabled: boolean
   note: string
+  /** 单设备停用原因（用户可见），空串表示未填。 */
+  reason?: string
+}
+
+/** 下发给客户端的单个工具生效状态。 */
+export interface EffectiveToolState {
+  enabled: boolean
+  reason?: 'disabled' | 'device_disabled' | 'channel_excluded' | 'version_too_low'
+  source: 'global' | 'device'
+  /** 内部备注，客户端不展示，保持兼容。 */
+  note?: string
+  /** 仅 enabled=false 且确有原因文案时下发：override.reason || tool.disabledReason */
+  disabledReason?: string
+  /** 停用原因文本来源：单设备原因填了就是 device，否则 global。 */
+  disabledReasonSource?: 'device' | 'global'
 }
 
 function bucketOf(sn: string): number {
@@ -385,10 +419,7 @@ export function effectiveConfig(
   const version = context.version || '0.0.0'
   const now = Date.now()
 
-  const tools: Record<
-    string,
-    { enabled: boolean; message: string; source: 'global' | 'device'; reason?: string; note?: string }
-  > = {}
+  const tools: Record<string, EffectiveToolState> = {}
   for (const tool of config.tools) {
     const channelOk = tool.channels.includes(channel)
     const versionOk = compareVersions(version, tool.minVersion) >= 0
@@ -396,23 +427,28 @@ export function effectiveConfig(
     const override = overrides?.get(tool.toolId)
     // 设备级开关优先于云端全局开关：既可以单独关闭，也可以单独放行。
     const enabled = override ? override.enabled : globalEnabled
-    tools[tool.toolId] = {
+    const state: EffectiveToolState = {
       enabled,
-      message: tool.message,
       source: override ? 'device' : 'global',
-      ...(override?.note ? { note: override.note } : {}),
-      ...(enabled
-        ? {}
-        : {
-            reason: override
-              ? 'device_disabled'
-              : !tool.enabled
-                ? 'disabled'
-                : !channelOk
-                  ? 'channel_excluded'
-                  : 'version_too_low',
-          }),
     }
+    if (override?.note) state.note = override.note
+    if (!enabled) {
+      state.reason = override
+        ? 'device_disabled'
+        : !tool.enabled
+          ? 'disabled'
+          : !channelOk
+            ? 'channel_excluded'
+            : 'version_too_low'
+      // 停用原因优先级：单设备原因 > 全局停用原因；两者都为空就不下发（客户端用默认文案）
+      const overrideReason = override?.reason ?? ''
+      const disabledReason = overrideReason || tool.disabledReason
+      if (disabledReason) {
+        state.disabledReason = disabledReason
+        state.disabledReasonSource = overrideReason ? 'device' : 'global'
+      }
+    }
+    tools[tool.toolId] = state
   }
 
   const announcements = config.announcements
@@ -494,13 +530,8 @@ export function parseStoredConfig(json: string): RemoteConfig {
         updateNotes: '',
       },
       content: { version: '1', rollout: 100, notes: '' },
-      tools: [...TOOL_BY_ID.keys()].map((toolId) => ({
-        toolId,
-        enabled: true,
-        minVersion: '1.0.0',
-        channels: ['stable', 'beta'],
-        message: '',
-      })),
+      // 兜底配置与正常配置使用同一份默认工具条目
+      tools: TOOLS.map((tool) => defaultToolConfig(tool.id)),
       announcements: [],
       features: [],
     })

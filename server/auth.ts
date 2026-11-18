@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { db, nowIso } from './db.js'
+import { IS_PRODUCTION } from './env.js'
 import { can, permissionsOf, roleName, type PermissionKey, type RoleId } from './permissions.js'
 
 export const SESSION_COOKIE = 'stb_console_session'
@@ -120,12 +121,13 @@ export function setSessionCookie(reply: FastifyReply, token: string): void {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
+    secure: IS_PRODUCTION,
     maxAge: Math.floor(SESSION_TTL_MS / 1000),
   })
 }
 
 export function clearSessionCookie(reply: FastifyReply): void {
-  reply.clearCookie(SESSION_COOKIE, { path: '/' })
+  reply.clearCookie(SESSION_COOKIE, { path: '/', secure: IS_PRODUCTION })
 }
 
 export function currentUser(request: FastifyRequest): SessionUser | null {
