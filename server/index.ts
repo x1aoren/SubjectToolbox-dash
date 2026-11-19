@@ -4,7 +4,7 @@ import staticPlugin from '@fastify/static'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ROOT, closeDb } from './db.js'
-import { IS_PRODUCTION } from './env.js'
+import { IS_PRODUCTION, logEnvFile } from './env.js'
 import { runMigrations } from './migrate.js'
 import { bootstrapProduction, logBootstrap } from './bootstrap.js'
 import { ensureSeeded } from './seed.js'
@@ -23,6 +23,9 @@ const HOST = process.env.HOST ?? '127.0.0.1'
 const WEB_DIST = resolve(ROOT, 'dist/web')
 
 async function main(): Promise<void> {
+  // 启动信息第一行：说明 .env 的加载结果（只打路径与数量，不打变量值）
+  logEnvFile()
+
   // 启动流程最前面：幂等迁移（补 device_tool_overrides.reason 列 + 归一化已存配置）
   const migration = runMigrations()
   if (

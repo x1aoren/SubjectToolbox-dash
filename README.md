@@ -58,6 +58,10 @@
 ```bash
 pnpm install
 
+# 可选：生成本地环境变量文件（仓库根目录 .env，已 gitignore；模板见 .env.example）
+cp .env.example .env
+# Windows PowerShell：Copy-Item .env.example .env
+
 # 开发模式：API 8787 + Vite 5173（已配置 /api、/v1 代理）
 pnpm dev
 # 打开 http://127.0.0.1:5173
@@ -81,6 +85,7 @@ pnpm screenshot  # 用本机 Edge 截取各页面（开发自检用）
 ```
 
 环境变量：`PORT`（默认 `8787`）、`HOST`（默认 `127.0.0.1`）、`STB_ENV` / `NODE_ENV`（设为 `production` 开启生产模式）、`STB_DATA_DIR`（数据目录，默认 `data/`）。
+所有环境变量也可以写在**仓库根目录的 `.env`** 里（启动时读取一次，参考 `.env.example`）：`.env` 已 gitignore、不要提交；**系统环境变量（shell / systemd / Docker）优先于 `.env`**，改完 `.env` 需要重启服务。
 数据文件与上传目录会自动创建在数据目录下；开发模式下首次启动检测到空库会自动播种演示数据，**生产模式不播种**。
 
 ### 演示账号（仅开发/演示模式）

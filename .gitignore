@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 dist/
 data/*.db
 data/*.db-journal
@@ -12,3 +12,9 @@ data/seed-credentials.txt
 .vscode/
 data/initial-admin.txt
 data/initial-client-key.txt
+
+# 本地环境变量（可能包含管理员密码/密钥，禁止入库）；示例文件 .env.example 例外
+.env
+.env.local
+.env.*.local
+!.env.example

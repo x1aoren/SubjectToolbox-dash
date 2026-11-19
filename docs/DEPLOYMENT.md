@@ -143,6 +143,13 @@ export STB_PUBLIC_URL=https://stb.mcobs.cn
 
 ### 4.3 环境变量
 
+环境变量可以来自两处，**系统环境变量优先**：
+
+1. 进程启动时的系统环境变量：systemd 的 `Environment=` / `EnvironmentFile=`、Docker `-e` / `env_file`、当前 shell 的 `export` / `$env:XXX`；
+2. 仓库根目录的 `.env` 文件（可缺省）：服务每次启动读取一次；已存在的系统环境变量不会被 `.env` 覆盖；支持 `#` 注释、引号、`export KEY=value`，Windows 记事本的 UTF-8 BOM 也能正确处理；可用 `STB_ENV_FILE` 指定其它路径。模板见仓库根目录 [`.env.example`](../.env.example)。
+
+`.env` 里可能有管理员密码，务必 **`chmod 600 .env` 且不要提交**（仓库 `.gitignore` 已忽略 `.env` / `.env.local`）；改了 `.env` 需要重启服务才生效。生产环境两种方式都行：单机/容器可用 `.env`，systemd 部署仍推荐 `EnvironmentFile`（见 6.1），两者同时存在时 systemd 的值优先。
+
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `STB_ENV` | 空（开发 / 演示） | 设为 `production` 开启生产模式 |
@@ -509,6 +516,7 @@ ss -ltnp | grep 8787          # Linux；Windows: netstat -ano | findstr :8787
 | 启动命令 | `pnpm start`（实际执行 `tsx server/index.ts`） |
 | 默认监听 | `127.0.0.1:8787`（`HOST` / `PORT`） |
 | 运行模式开关 | `STB_ENV=production` 或 `NODE_ENV=production` |
+| 本地环境变量文件 | 仓库根目录 `.env`（可缺省；系统环境变量优先；模板 `.env.example`，已 gitignore） |
 | 数据目录 | `data/`（默认）或 `STB_DATA_DIR` |
 | 数据库 | `data/console.db`（WAL，伴随 `-wal`/`-shm`） |
 | 上传目录 | `data/uploads/`（自动创建） |
