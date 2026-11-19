@@ -157,7 +157,7 @@ export STB_PUBLIC_URL=https://stb.mcobs.cn
 | `STB_ORG_NAME` | 不覆盖 | 同上，「组织名称」（≤120 字） |
 | `STB_ALLOW_ANONYMOUS` | 不设置（关闭） | 设为 `1` 时**每次启动强制开启**匿名上报（`allow_anonymous_ingest=1`）；不设置时生产模式**首次初始化写 0（关闭）**，之后在控制台「系统设置 → 允许匿名上报」里改的值会保留，重启不会被覆盖 |
 
-> 生产默认**关闭匿名上报**：客户端请求 `/v1/telemetry/*`、`/v1/config`、`/v1/feedback` 时必须携带有效的 `X-STB-Key`，否则返回 401 `missing_api_key`。`/v1/health` 不需要密钥，可直接用于探活。
+> 生产默认**关闭匿名上报**：客户端请求 `/v1/telemetry/*`、`/v1/config`、`/v1/config/revision`、`/v1/feedback` 时必须携带有效的 `X-STB-Key`，否则返回 401 `missing_api_key`。`/v1/health` 不需要密钥，可直接用于探活。
 
 ### 4.4 确认「没有演示数据」
 
@@ -420,9 +420,13 @@ curl -s https://stb.mcobs.cn/v1/health
 # 带密钥拉配置：tools 应有 14 项（11 个主工具 + 2 个示意图子项 + 意见反馈）
 curl -s 'https://stb.mcobs.cn/v1/config?version=1.1.0&channel=stable&sn=SN-TEST01' \
   -H "X-STB-Key: stb_live_…"
+
+# 前台短轮询专用（轻量）：只返回修订号与单设备覆盖指纹，响应 <1KB
+curl -s 'https://stb.mcobs.cn/v1/config/revision?sn=SN-TEST01' \
+  -H "X-STB-Key: stb_live_…"
 ```
 
-- 客户端启动后先调 `/v1/telemetry/handshake` 登记设备并直接拿到生效配置；连上后可在控制台「遥测 → 设备」看到该 SN。
+- 客户端启动后先调 `/v1/telemetry/handshake` 登记设备并直接拿到生效配置；连上后可在控制台「遥测 → 设备」看到该 SN。之后 App 在前台时每 30–60 秒（每 tick 随机）调一次 `/v1/config/revision`，只比对修订号与单设备覆盖指纹，有变化才拉全量；退到后台停止，不建立常驻连接。
 - 客户端「设置 → 云端同步」能看到修订号与最近同步时间；后台「系统 → 接入文档」可核对当前请求密钥是否匹配。
 
 ### 9.3 真机调试（仅开发）
@@ -436,8 +440,8 @@ adb reverse tcp:8787 tcp:8787
 
 ### 9.4 上线后确认客户端受控
 
-- 控制台「云端控制 → 工具开关」关闭某个工具并**发布配置**后，客户端下一次拉取配置（最多 6 小时，或设置页「立即同步」）会把它置灰并标注「已停用」，点击弹出停用原因；**不会从主页消失**。
-- 只影响单台设备：设备详情 →「单设备功能控制」开关，保存后**不需要发布**，该设备下次拉配置即生效；「停用原因（本设备）」会优先于全局原因展示。
+- 控制台「云端控制 → 工具开关」关闭某个工具并**发布配置**后，客户端在前台时会在下一次 revision 轮询（30–60 秒内）发现修订号变化并拉取配置，把它置灰并标注「已停用」，点击弹出停用原因；**不会从主页消失**。完整配置仍保留 6 小时兜底同步。
+- 只影响单台设备：设备详情 →「单设备功能控制」开关，保存后**不需要发布**；该设备的单设备覆盖指纹会变化，前台轮询同样在 30–60 秒内发现并拉取配置（不在前台时等下次进入前台或手动「立即同步」）；「停用原因（本设备）」会优先于全局原因展示。
 - 示意图子项（细胞分裂 / 地球自转）和主页右上角意见反馈入口同样受上述开关控制。
 
 ## 10. 常见问题
@@ -511,7 +515,8 @@ ss -ltnp | grep 8787          # Linux；Windows: netstat -ano | findstr :8787
 | 初始化文件 | `data/initial-admin.txt`、`data/initial-client-key.txt`（仅首次创建） |
 | 控制台前端 | `dist/web`（`pnpm build` 产物；缺失时 API 仍可用） |
 | 探活 | `GET /v1/health`（公开）、`GET /api/system/health`（公开） |
-| 客户端接口 | `/v1/telemetry/handshake`、`/v1/telemetry/events`、`/v1/telemetry/errors`、`/v1/config`、`/v1/feedback*` |
+| 客户端接口 | `/v1/telemetry/handshake`、`/v1/telemetry/events`、`/v1/telemetry/errors`、`/v1/config`、`/v1/config/revision`、`/v1/feedback*` |
+| 前台轮询频率 | 每台在线设备 30–60 秒一次 `/v1/config/revision`（约 60–120 次/小时，仅前台，服务端按 SN 限流 180 次/小时） |
 | 生产禁止接口 | `POST /api/system/reset-demo`（403）、`pnpm seed`（exit 1） |
 | 日志 | stdout / stderr；systemd 下用 `journalctl -u subjecttoolbox-console` |
 

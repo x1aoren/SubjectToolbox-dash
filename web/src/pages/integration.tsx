@@ -132,7 +132,7 @@ export function IntegrationPage(): React.JSX.Element {
       path: '/v1/config',
       title: '拉取云端配置',
       description:
-        '不修改设备状态，可用于定时刷新。返回可用的工具列表、未过期的公告、版本策略与功能开关。被停用的工具 enabled=false，并带上已解析好的 disabledReason。',
+        '拉取完整生效配置（工具开关、公告、版本策略、功能开关与节流参数）。被停用的工具 enabled=false，并带上已解析好的 disabledReason。客户端只在前台 revision 轮询发现变化后才调用它。',
       code: `curl "${base}/v1/config?version=1.1.0&channel=stable&sn=SN-8F3A2C91D4B6" \\
   -H "X-STB-Key: ${key}"`,
       sample: `{
@@ -158,11 +158,28 @@ export function IntegrationPage(): React.JSX.Element {
   "announcements": [],
   "features": {},
   "sync": {
-    "configIntervalSeconds": 900,
-    "telemetryFlushIntervalSeconds": 300,
-    "telemetryBatchMax": 500,
+    "configIntervalSeconds": 21600,
+    "telemetryFlushIntervalSeconds": 600,
+    "telemetryBatchMax": 200,
+    "revisionPollMinSeconds": 30,
+    "revisionPollMaxSeconds": 60,
     "nextConfigAt": "2026-11-18T08:00:00.000Z"
   }
+}`,
+    },
+    {
+      id: 'config-revision',
+      method: 'GET' as const,
+      path: '/v1/config/revision',
+      title: '轮询配置修订号',
+      description:
+        '前台短轮询专用轻量接口：只返回当前生效配置的修订号（不返回配置内容，响应 <1KB）。客户端在前台时按 sync.revisionPollMinSeconds–revisionPollMaxSeconds 的随机间隔调用，修订号与本地缓存不同才去 /v1/config 拉全量；退到后台停止轮询，不建立常驻连接。',
+      code: `curl "${base}/v1/config/revision?sn=SN-8F3A2C91D4B6" \\
+  -H "X-STB-Key: ${key}"`,
+      sample: `{
+  "ok": true,
+  "revision": 3,
+  "serverTime": "2026-11-18T08:00:00.000Z"
 }`,
     },
     {

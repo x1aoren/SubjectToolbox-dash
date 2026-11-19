@@ -140,6 +140,17 @@ function syncClientTools(sn: string, rawTools: unknown, at: string): number {
   }
   return seen.size
 }
+/** 单设备覆盖指纹：数量 + 最近更新时间；前台轮询据此判断“是否需要拉全量配置”。
+ *  设备级启停不发布修订，因此不能只看全局 revision。 */
+function deviceOverrideMark(sn: string): { count: number; updatedAt: string | null } {
+  const row = db()
+    .prepare(
+      'SELECT COUNT(*) AS n, MAX(updated_at) AS m FROM device_tool_overrides WHERE sn = ?',
+    )
+    .get(sn) as { n: number; m: string | null } | undefined
+  return { count: Number(row?.n ?? 0), updatedAt: row?.m ?? null }
+}
+
 export async function clientRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/health', async () => ({
     ok: true,
@@ -160,6 +171,23 @@ export async function clientRoutes(app: FastifyInstance): Promise<void> {
     const effective = effectiveConfig(config, { version, channel, sn }, overrideMap(sn))
     reply.header('Cache-Control', 'no-store')
     return { revision, ...effective }
+  })
+
+  // 前台短轮询：只返回当前生效配置的修订号 + 本机单设备覆盖指纹，客户端发现变化后再走 /v1/config 拉全量。
+  // 30–60 秒一次，最坏 120 次/小时；留出重试余量按 180 次/小时限流。
+  app.get('/v1/config/revision', async (request) => {
+    authorizeClient(request, 'config')
+    const query = request.query as Row
+    const sn = clampText(query.sn, 64) || 'anonymous'
+    if (!allow(`rev:${sn}`, 180, 3_600_000)) {
+      fail(429, 'too_many_requests', '修订号查询过于频繁，请稍后再试')
+    }
+    return {
+      ok: true,
+      revision: publishedConfig().revision,
+      deviceOverrides: deviceOverrideMark(sn),
+      serverTime: nowIso(),
+    }
   })
 
   app.post('/v1/telemetry/handshake', async (request) => {
@@ -218,6 +246,8 @@ export async function clientRoutes(app: FastifyInstance): Promise<void> {
       serverTime: at,
       revision,
       toolsSynced,
+      // 供客户端初始化“单设备覆盖指纹”，避免前台轮询首 tick 多拉一次全量配置
+      deviceOverrides: deviceOverrideMark(sn),
       config: effective,
     }
   })

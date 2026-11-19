@@ -378,6 +378,10 @@ export const CLIENT_POLICY = {
   telemetryFlushIntervalSeconds: 10 * 60,
   /** 单次上报的最大事件数 */
   telemetryBatchMax: 200,
+  /** 前台 revision 轮询的最小间隔（秒） */
+  revisionPollMinSeconds: 30,
+  /** 前台 revision 轮询的最大间隔（秒） */
+  revisionPollMaxSeconds: 60,
   /** 本地队列上限 */
   telemetryQueueMaxEvents: 800,
   /** 本地队列文件上限（字节） */
@@ -510,6 +514,9 @@ export function effectiveConfig(
       configIntervalSeconds: CLIENT_POLICY.configSyncIntervalSeconds,
       telemetryFlushIntervalSeconds: CLIENT_POLICY.telemetryFlushIntervalSeconds,
       telemetryBatchMax: CLIENT_POLICY.telemetryBatchMax,
+      /** 前台短轮询：客户端每 tick 在 [min, max] 秒里取随机值查修订号，变化才拉全量配置 */
+      revisionPollMinSeconds: CLIENT_POLICY.revisionPollMinSeconds,
+      revisionPollMaxSeconds: CLIENT_POLICY.revisionPollMaxSeconds,
       nextConfigAt: new Date(now + CLIENT_POLICY.configSyncIntervalSeconds * 1000).toISOString(),
     },
   }
