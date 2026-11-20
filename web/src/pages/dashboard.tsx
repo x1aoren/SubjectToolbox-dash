@@ -160,7 +160,8 @@ export function DashboardPage(): React.JSX.Element {
   const navigate = useNavigate()
   const [range, setRange] = useState(7)
   const { data, loading, error, reload } = useApi<Overview>(`/api/overview?range=${range}`)
-  useInterval(() => reload(), 120_000)
+  // 客户端约 60 秒上报一次遥测，页面 30 秒自动刷新一次，数据接近实时；手动刷新按钮仍然可用。
+  useInterval(() => reload(), 30_000)
 
   if (!data && loading) {
     return (

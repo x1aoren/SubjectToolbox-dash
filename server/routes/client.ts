@@ -182,6 +182,11 @@ export async function clientRoutes(app: FastifyInstance): Promise<void> {
     if (!allow(`rev:${sn}`, 180, 3_600_000)) {
       fail(429, 'too_many_requests', '修订号查询过于频繁，请稍后再试')
     }
+    // 心跳语义：能每 30–60 秒轮询一次，说明这台设备正在前台使用。
+    // 顺手刷新 last_seen_at，否则控制台的「在线 / 活跃」要等到下一次遥测上报才更新。
+    if (sn !== 'anonymous') {
+      db().prepare('UPDATE devices SET last_seen_at = ? WHERE sn = ?').run(nowIso(), sn)
+    }
     return {
       ok: true,
       revision: publishedConfig().revision,
@@ -258,7 +263,9 @@ export async function clientRoutes(app: FastifyInstance): Promise<void> {
     const sn = clampText(body.sn, 64)
     const device = deviceRow(sn)
     if (!device) fail(404, 'device_not_registered', '请先调用 /v1/telemetry/handshake 注册设备')
-    if (!allow(`ev:${sn}`, 30, 3_600_000)) {
+    // 客户端前台按 sync.telemetryFlushIntervalSeconds（60 秒）节奏上报，附加失败重试余量，
+    // 每台设备每小时 240 次足够；调大间隔时这里可以同步放宽，调小则要小心课堂高峰期的放大。
+    if (!allow(`ev:${sn}`, 240, 3_600_000)) {
       fail(429, 'too_many_requests', '上报过于频繁，请稍后再试')
     }
     if (!Array.isArray(body.events)) fail(400, 'invalid_events', 'events 必须是数组')

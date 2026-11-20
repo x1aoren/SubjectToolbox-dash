@@ -374,8 +374,8 @@ export interface ClientContext {
 export const CLIENT_POLICY = {
   /** 两次配置同步之间的最小间隔（6 小时） */
   configSyncIntervalSeconds: 6 * 60 * 60,
-  /** 遥测队列的最小上报间隔（10 分钟） */
-  telemetryFlushIntervalSeconds: 10 * 60,
+  /** 遥测队列的最小上报间隔（60 秒）：客户端前台按这个节奏自动上传，控制台数据接近实时 */
+  telemetryFlushIntervalSeconds: 60,
   /** 单次上报的最大事件数 */
   telemetryBatchMax: 200,
   /** 前台 revision 轮询的最小间隔（秒） */

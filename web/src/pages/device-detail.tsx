@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { del, put } from '../lib/api'
 import { useAuth, useCatalog, useToast } from '../lib/app-context'
-import { useApi } from '../lib/useApi'
+import { useApi, useInterval } from '../lib/useApi'
 import {
   CHANNEL_LABELS,
   DEVICE_STATUS,
@@ -54,6 +54,8 @@ export function DeviceDetailPage(): React.JSX.Element {
   const { data, loading, error, reload } = useApi<DeviceDetailResponse>(
     `/api/devices/${encodeURIComponent(sn)}`,
   )
+  // 客户端约 60 秒上报一次遥测，页面 30 秒自动刷新一次，单机数据接近实时。
+  useInterval(() => reload(), 30_000)
   const overrides = useApi<DeviceOverrideResponse>(
     can('config.view') ? `/api/devices/${encodeURIComponent(sn)}/overrides` : null,
   )

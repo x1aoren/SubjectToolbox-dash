@@ -10,7 +10,7 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
-import { useApi } from '../lib/useApi'
+import { useApi, useInterval } from '../lib/useApi'
 import {
   SUBJECT_COLORS,
   SUBJECT_NAMES,
@@ -39,6 +39,8 @@ const RANGES = [
 export function ToolsPage(): React.JSX.Element {
   const [range, setRange] = useState(30)
   const { data, loading, error, reload } = useApi<Overview>(`/api/overview?range=${range}`)
+  // 客户端约 60 秒上报一次遥测，页面 30 秒自动刷新一次，数据接近实时。
+  useInterval(() => reload(), 30_000)
 
   if (!data && loading) {
     return (
