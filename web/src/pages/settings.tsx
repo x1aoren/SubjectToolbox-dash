@@ -340,7 +340,8 @@ interface SettingsResponse {
 }
 
 function SystemSection(): React.JSX.Element {
-  const { can } = useAuth()
+  const { can, meta } = useAuth()
+  const isProduction = meta?.production === true
   const { toast } = useToast()
   const { data, loading, reload } = useApi<SettingsResponse>(can('settings.manage') ? '/api/settings' : null)
   const [form, setForm] = useState<SystemSettings | null>(null)
@@ -429,7 +430,9 @@ function SystemSection(): React.JSX.Element {
               <div>
                 <div className="text-[12.5px] font-medium text-ink">允许匿名上报</div>
                 <p className="mt-0.5 text-[11px] text-muted">
-                  关闭后客户端必须携带有效的 X-STB-Key。校内演示环境建议保持开启。
+                  {isProduction
+                    ? '关闭后客户端必须携带有效的 X-STB-Key。'
+                    : '关闭后客户端必须携带有效的 X-STB-Key。校内演示环境建议保持开启。'}
                 </p>
               </div>
               <Switch
@@ -441,7 +444,9 @@ function SystemSection(): React.JSX.Element {
             <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-3.5">
               <div>
                 <div className="text-[12.5px] font-medium text-ink">数据留存</div>
-                <p className="mt-0.5 text-[11px] text-muted">演示环境不会自动清理，正式部署需要定时任务。</p>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  {isProduction ? '过期数据需要定时任务清理。' : '演示环境不会自动清理，正式部署需要定时任务。'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Input
