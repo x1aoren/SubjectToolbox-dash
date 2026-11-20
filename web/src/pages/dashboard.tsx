@@ -291,7 +291,7 @@ export function DashboardPage(): React.JSX.Element {
         <Card className="xl:col-span-8">
           <CardHeader
             title="活跃设备与使用会话"
-            description={`近 ${range} 个完整日（不含今天）· 上海时区`}
+            description={`近 ${range} 天（含今天，今日为实时数据）· 上海时区`}
             action={
               <div className="flex items-center gap-3 text-[10.5px] text-muted">
                 <span className="flex items-center gap-1.5">
