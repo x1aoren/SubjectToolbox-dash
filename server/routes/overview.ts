@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { db } from '../db.js'
 import { requirePermission } from '../auth.js'
 import { parseRange, todayRange, trailingDays } from '../http.js'
-import { SUBJECTS, TOOLS, TOOL_BY_ID } from '../catalog.js'
+import { PRIMARY_TOOLS, SUBJECTS, TOOL_BY_ID } from '../catalog.js'
 
 const DAY_MS = 86_400_000
 
@@ -29,8 +29,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/overview', async (request) => {
     requirePermission(request, 'dashboard.view')
     const range = parseRange((request.query as Row).range)
-    const { startIso, endIso, dates } = trailingDays(range)
-    const prevStartIso = new Date(Date.parse(startIso) - range * DAY_MS).toISOString()
+    const { startIso, endIso, prevStartIso, prevEndIso, dates } = trailingDays(range)
     const today = todayRange()
 
     const sessionsCur = one<{ n: number; d: number; avg: number }>(
@@ -43,7 +42,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
       `SELECT COUNT(*) AS n, COUNT(DISTINCT sn) AS d FROM events
        WHERE name = 'session_start' AND occurred_at >= ? AND occurred_at < ?`,
       prevStartIso,
-      startIso,
+      prevEndIso,
     )
     const opensCur = one<{ n: number; d: number }>(
       `SELECT COUNT(*) AS n, COUNT(DISTINCT sn) AS d FROM events
@@ -54,7 +53,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
     const opensPrev = one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM events WHERE name = 'tool_open' AND occurred_at >= ? AND occurred_at < ?`,
       prevStartIso,
-      startIso,
+      prevEndIso,
     )
     const errorsCur = one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM errors WHERE occurred_at >= ? AND occurred_at < ?`,
@@ -64,7 +63,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
     const errorsPrev = one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM errors WHERE occurred_at >= ? AND occurred_at < ?`,
       prevStartIso,
-      startIso,
+      prevEndIso,
     )
     const newDevicesCur = one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM devices WHERE first_seen_at >= ? AND first_seen_at < ?`,
@@ -74,7 +73,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
     const newDevicesPrev = one<{ n: number }>(
       `SELECT COUNT(*) AS n FROM devices WHERE first_seen_at >= ? AND first_seen_at < ?`,
       prevStartIso,
-      startIso,
+      prevEndIso,
     )
     const todayStats = one<{ devices: number; sessions: number; opens: number }>(
       `SELECT
@@ -183,7 +182,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
       `SELECT tool_id, COUNT(*) AS opens FROM events
        WHERE name = 'tool_open' AND occurred_at >= ? AND occurred_at < ? GROUP BY tool_id`,
       prevStartIso,
-      startIso,
+      prevEndIso,
     )
     const toolErrors = many<{ tool_id: string; n: number }>(
       `SELECT tool_id, COUNT(*) AS n FROM errors
@@ -193,10 +192,15 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
     )
     const prevOpenMap = new Map(toolOpensPrev.map((row) => [row.tool_id, num(row.opens)]))
     const errorToolMap = new Map(toolErrors.map((row) => [row.tool_id, num(row.n)]))
-    const totalToolOpens = toolOpens.reduce((sum, row) => sum + num(row.opens), 0)
+    const openByTool = new Map(toolOpens.map((row) => [row.tool_id, row]))
+    // 工具排行/工具元数据只统计主工具（子工具、功能入口不计入，见契约第 1 节）
+    const primaryToolIds = new Set(PRIMARY_TOOLS.map((tool) => tool.id))
+    const totalToolOpens = toolOpens
+      .filter((row) => primaryToolIds.has(row.tool_id))
+      .reduce((sum, row) => sum + num(row.opens), 0)
 
-    const tools = TOOLS.map((tool) => {
-      const row = toolOpens.find((entry) => entry.tool_id === tool.id)
+    const tools = PRIMARY_TOOLS.map((tool) => {
+      const row = openByTool.get(tool.id)
       const opens = num(row?.opens)
       return {
         toolId: tool.id,
@@ -362,7 +366,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
       topErrors,
       recentFeedback,
       activity,
-      toolMeta: TOOLS.map((tool) => ({
+      toolMeta: PRIMARY_TOOLS.map((tool) => ({
         id: tool.id,
         title: tool.title,
         subjectId: tool.subjectId,

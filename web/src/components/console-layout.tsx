@@ -80,9 +80,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }): React.JSX.Elem
 }
 
 function SidebarFooter(): React.JSX.Element {
-  const { user, logout } = useAuth()
+  const { user, meta, logout } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
+  // 演示环境标记只在非生产部署显示；生产环境只保留版本号
+  const demoLabel = meta?.production === false ? ' · 演示环境' : ''
 
   return (
     <div className="border-t border-line/80 p-2.5">
@@ -101,7 +103,7 @@ function SidebarFooter(): React.JSX.Element {
         </button>
       ) : null}
       <div className="mt-1 flex items-center justify-between px-2 py-1">
-        <span className="text-[10px] text-faint">v1.0 · 演示环境</span>
+        <span className="text-[10px] text-faint">v1.0{demoLabel}</span>
         <button
           type="button"
           onClick={async () => {
@@ -425,7 +427,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
 }
 
 export function ConsoleLayout(): React.JSX.Element {
-  const { user } = useAuth()
+  const { user, meta } = useAuth()
   const location = useLocation()
   const { resolved, toggle } = useTheme()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -516,7 +518,7 @@ export function ConsoleLayout(): React.JSX.Element {
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-positive" />
-            服务运行中 · 数据仅供校内演示
+            {meta?.production === false ? '服务运行中 · 数据仅供校内演示' : '服务运行中'}
           </span>
         </footer>
       </div>

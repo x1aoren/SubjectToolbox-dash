@@ -10,7 +10,7 @@ import {
   type RemoteConfig,
 } from '../config-domain.js'
 import { TOOLS, TOOL_BY_ID } from '../catalog.js'
-import { clearOverrides, overrideMap, overrideRows, setOverride } from '../overrides.js'
+import { clampReason, clearOverrides, overrideMap, overrideRows, setOverride } from '../overrides.js'
 
 type Row = Record<string, unknown>
 
@@ -99,6 +99,7 @@ function overridePayload(sn: string) {
   })
   const rows = overrideRows(sn)
   const rowMap = new Map(rows.map((row) => [row.toolId, row]))
+  const globalReasonById = new Map(config.tools.map((tool) => [tool.toolId, tool.disabledReason]))
   const tools = TOOLS.map((tool) => {
     const state = base.tools[tool.id]!
     const row = rowMap.get(tool.id)
@@ -108,10 +109,14 @@ function overridePayload(sn: string) {
       subjectId: tool.subjectId,
       glyph: tool.glyph,
       summary: tool.summary,
+      kind: tool.kind ?? 'tool',
+      parentId: tool.parentId ?? null,
       globalEnabled: state.enabled,
       overrideEnabled: row ? row.enabled : null,
       effectiveEnabled: row ? row.enabled : state.enabled,
       note: row?.note ?? '',
+      reason: row?.reason ?? '',
+      disabledReasonGlobal: globalReasonById.get(tool.id) ?? '',
       updatedBy: row?.updatedBy ?? '',
       updatedAt: row?.updatedAt ?? null,
     }
@@ -302,16 +307,24 @@ export async function configRoutes(app: FastifyInstance): Promise<void> {
       | { model: string }
       | undefined
     if (!device) fail(404, 'not_found', '设备不存在')
-    const body = (request.body ?? {}) as { toolId?: string; enabled?: boolean | null; note?: string }
+    const body = (request.body ?? {}) as {
+      toolId?: string
+      enabled?: boolean | null
+      note?: string
+      reason?: string
+    }
     const toolId = clampText(body.toolId, 80)
     if (!TOOL_BY_ID.has(toolId)) fail(400, 'unknown_tool', '未知工具')
     const enabled =
       body.enabled === null || body.enabled === undefined ? null : Boolean(body.enabled)
+    const note = clampText(body.note, 200)
+    const reason = clampReason(body.reason)
     setOverride({
       sn,
       toolId,
       enabled,
-      note: clampText(body.note, 200),
+      note,
+      reason,
       userId: user.id,
       userName: user.displayName,
     })
@@ -325,7 +338,7 @@ export async function configRoutes(app: FastifyInstance): Promise<void> {
       `${device.model} · ${sn}`,
       enabled === null
         ? `恢复 ${title} 的云端默认状态`
-        : `${enabled ? '单独启用' : '单独停用'} ${title}${body.note ? `：${clampText(body.note, 60)}` : ''}`,
+        : `${enabled ? '单独启用' : '单独停用'} ${title}${reason ? `，停用原因：${clampText(reason, 60)}` : ''}${note ? `，备注：${clampText(note, 60)}` : ''}`,
     )
     return overridePayload(sn)
   })

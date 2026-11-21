@@ -115,17 +115,39 @@ export function sendCsv(reply: import('fastify').FastifyReply, filename: string,
 const DAY_MS = 86_400_000
 const SHANGHAI_OFFSET = 8 * 3_600_000
 
-/** 返回截至今天（不含今天，即最后一个完整日）的 N 天窗口 [startIso, endIso)。 */
-export function trailingDays(days: number): { startIso: string; endIso: string; dates: string[] } {
+/**
+ * 返回「近 N 个自然日（含今天）」的统计窗口：
+ * [startIso, endIso) 从 N-1 天前的上海零点开始，到当前时刻为止（今天只统计到此刻）。
+ * 同时给出上一个等长窗口 [prevStartIso, prevEndIso)（整体前移 N 天），
+ * 环比比的是「同样统计到同一时刻」的两段数据，不会因为今天还没过完就显示暴跌。
+ *
+ * 早先这里刻意只统计「完整日」、把今天排除在外，导致新部署的服务器当天只有今天的
+ * 真实数据时，概览和工具使用页全是 0，而单设备详情（不限时间）却有数据，看起来像统计坏了。
+ */
+export function trailingDays(days: number): {
+  startIso: string
+  endIso: string
+  prevStartIso: string
+  prevEndIso: string
+  dates: string[]
+} {
   const now = Date.now()
   const todayStart = now - ((now + SHANGHAI_OFFSET) % DAY_MS)
-  const end = todayStart
-  const start = todayStart - days * DAY_MS
+  const start = todayStart - (days - 1) * DAY_MS
+  const end = now
+  const prevStart = start - days * DAY_MS
+  const prevEnd = end - days * DAY_MS
   const dates: string[] = []
   for (let index = 0; index < days; index += 1) {
     dates.push(isoDate(start + index * DAY_MS))
   }
-  return { startIso: new Date(start).toISOString(), endIso: new Date(end).toISOString(), dates }
+  return {
+    startIso: new Date(start).toISOString(),
+    endIso: new Date(end).toISOString(),
+    prevStartIso: new Date(prevStart).toISOString(),
+    prevEndIso: new Date(prevEnd).toISOString(),
+    dates,
+  }
 }
 
 /** 今天（上海时区）的起止。 */

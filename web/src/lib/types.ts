@@ -19,8 +19,16 @@ export interface PublicMeta {
   counts: { devices: number; feedback: number; events: number }
   demoMode: boolean
   demoAccount: { username: string; password: string } | null
+  /** 生产模式：不播种演示数据、不展示演示账号、不允许重建演示数据 */
+  production: boolean
   serverTime: string
 }
+
+/** 工具类型：普通工具 / 交互示意图子项 / 主页功能入口 */
+export type ToolKind = 'tool' | 'diagram' | 'feature'
+
+/** 停用原因的来源：单设备覆盖 / 全局配置 */
+export type DisabledReasonSource = 'device' | 'global'
 
 export interface Subject {
   id: string
@@ -37,6 +45,10 @@ export interface ToolMeta {
   summary: string
   glyph: string
   weight?: number
+  /** 缺省视为 'tool' */
+  kind?: ToolKind
+  /** 子工具所属的父工具 id；主工具为 null */
+  parentId?: string | null
 }
 
 export interface ReleaseMeta {
@@ -352,7 +364,8 @@ export interface ToolConfig {
   enabled: boolean
   minVersion: string
   channels: string[]
-  message: string
+  /** 全局停用原因文案（0–120 字，空串表示使用客户端默认文案） */
+  disabledReason: string
 }
 
 export interface Announcement {
@@ -440,7 +453,16 @@ export interface ConfigPreview {
       updateRequired: boolean
     }
     content: { version: string; notes: string; available: boolean; bucket: number }
-    tools: Record<string, { enabled: boolean; message: string; reason?: string; source?: 'global' | 'device'; note?: string }>
+    tools: Record<string, {
+      enabled: boolean
+      reason?: string
+      source?: 'global' | 'device'
+      note?: string
+      /** 仅 enabled=false 时下发：override.reason || tool.disabledReason */
+      disabledReason?: string
+      /** 停用原因文本来源：单设备原因填了就是 device，否则 global */
+      disabledReasonSource?: DisabledReasonSource
+    }>
     announcements: Array<{
       id: string
       title: string
@@ -576,6 +598,13 @@ export interface DeviceOverrideTool {
   overrideEnabled: boolean | null
   effectiveEnabled: boolean
   note: string
+  /** 本设备停用原因（空串表示未填，客户端回退到全局原因） */
+  reason: string
+  /** 子工具所属的父工具 id；主工具为 null */
+  parentId: string | null
+  kind: ToolKind
+  /** 已发布配置里的全局停用原因，供后台对照显示 */
+  disabledReasonGlobal: string
   updatedBy: string
   updatedAt: string | null
 }

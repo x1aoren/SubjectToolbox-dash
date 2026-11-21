@@ -18,6 +18,7 @@ import {
   type UserRow,
 } from '../auth.js'
 import { db, getSetting, getSettings, nowIso } from '../db.js'
+import { IS_PRODUCTION } from '../env.js'
 import { audit, clampText, clientIp, fail } from '../http.js'
 import { isRoleId } from '../permissions.js'
 
@@ -31,12 +32,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       feedback: (db().prepare('SELECT COUNT(*) AS n FROM feedback').get() as { n: number }).n,
       events: (db().prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n,
     }
-    const demo = Boolean(settings.demo_seeded_at)
+    // 生产模式恒不返回演示账号，demoSeededAt 也不会被写入
+    const demo = !IS_PRODUCTION && Boolean(settings.demo_seeded_at)
     return {
       workspaceName: settings.workspace_name ?? '学科工具箱',
       orgName: settings.org_name ?? '',
       version: '1.0.0',
       counts,
+      production: IS_PRODUCTION,
       demoMode: demo,
       demoAccount: demo ? { username: 'admin', password: 'STB-admin-2026' } : null,
       serverTime: nowIso(),

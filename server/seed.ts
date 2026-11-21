@@ -5,12 +5,15 @@ import {
   GRADES,
   LATEST_VERSION,
   LATEST_VERSION_CODE,
+  PRIMARY_TOOLS,
   RELEASES,
   SCHOOLS,
   TOOLS,
   TOOL_BY_ID,
 } from './catalog.js'
 import { DATA_DIR, DEFAULT_SETTINGS, SCHEMA, db, nowIso, tx } from './db.js'
+import { IS_PRODUCTION } from './env.js'
+import { runMigrations } from './migrate.js'
 import { hashPassword, issueApiKey } from './auth.js'
 
 /* ------------------------------------------------------------------ */
@@ -454,7 +457,7 @@ function buildConfig(options: { includeDraftExtras: boolean }) {
     enabled: true,
     minVersion: '1.0.0',
     channels: ['stable', 'beta'],
-    message:
+    disabledReason:
       tool.id === 'other.textbook'
         ? '需要连接网络访问人教社官网'
         : tool.id === 'geography.diagram'
@@ -503,7 +506,7 @@ function buildConfig(options: { includeDraftExtras: boolean }) {
 
   const textbook = toolEntries.find((entry) => entry.toolId === 'other.textbook')
   if (options.includeDraftExtras && textbook) {
-    textbook.message = '需连接校园网并完成统一认证后访问人教社官网'
+    textbook.disabledReason = '需连接校园网并完成统一认证后访问人教社官网'
   }
 
   return {
@@ -579,7 +582,8 @@ const HOUR_WEIGHTS: ReadonlyArray<readonly [number, number]> = [
   [22, 2],
 ]
 
-const TOOL_WEIGHTS = TOOLS.map((tool) => [tool.id, tool.weight] as const)
+// 演示事件只为主工具生成：子工具/功能入口的 weight 都是 0，不该进入工具排行
+const TOOL_WEIGHTS = PRIMARY_TOOLS.map((tool) => [tool.id, tool.weight] as const)
 
 function versionAt(device: SeedDevice, atMs: number): { version: string; code: number } {
   if (atMs >= Date.parse('2026-11-14T00:00:00.000Z')) {
@@ -599,6 +603,8 @@ export function seedDatabase(options: { reset: boolean }): {
   errors: number
   credentials: string
 } {
+  // 兼容旧库：直接运行 `pnpm seed` 时没有 index.ts 的启动迁移，这里先补列 / 归一化配置
+  runMigrations()
   if (options.reset) {
     const database = db()
     database.exec('PRAGMA foreign_keys = OFF;')
@@ -1051,23 +1057,26 @@ export function seedDatabase(options: { reset: boolean }): {
         toolId: 'other.textbook',
         enabled: false,
         note: '该教室网络改造期间先单独关闭，避免学生反复等待',
+        reason: '教室网络改造，暂停使用电子教材',
       },
       {
         index: 17,
         toolId: 'geography.diagram',
         enabled: false,
         note: '任课老师申请暂时隐藏地理示意图',
+        reason: '底图合规来源待确认，暂停使用地理示意图',
       },
       {
         index: 41,
         toolId: 'chemistry.equation',
         enabled: false,
         note: '化学竞赛班临时停用，考试后再恢复',
+        reason: '化学竞赛班考试期间暂停使用',
       },
     ]
     const insertOverride = database.prepare(
-      `INSERT INTO device_tool_overrides(sn, tool_id, enabled, note, updated_by, updated_by_name, updated_at)
-       VALUES(?,?,?,?,?,?,?)`,
+      `INSERT INTO device_tool_overrides(sn, tool_id, enabled, note, reason, updated_by, updated_by_name, updated_at)
+       VALUES(?,?,?,?,?,?,?,?)`,
     )
     for (const seed of overrideSeeds) {
       const device = devices[seed.index]
@@ -1077,6 +1086,7 @@ export function seedDatabase(options: { reset: boolean }): {
         seed.toolId,
         seed.enabled ? 1 : 0,
         seed.note,
+        seed.reason,
         liuyanId,
         '刘妍',
         iso(daysAgoMs(randInt(1, 4))),
@@ -1438,7 +1448,17 @@ export function ensureSeeded(): { seeded: boolean; credentials?: string } {
 const isDirectRun = process.argv[1]?.replace(/\\/g, '/').endsWith('/server/seed.ts')
 
 if (isDirectRun) {
-  const reset = process.argv.includes('--reset')
+  if (IS_PRODUCTION && !process.argv.includes('--force')) {
+    console.error(
+      '[seed] 生产模式（STB_ENV/NODE_ENV=production）拒绝写入演示数据。' +
+        '确需在既定数据库上重建演示数据时请显式加 --force（会清空业务数据，请先备份）。',
+    )
+    process.exit(1)
+  }
+  if (IS_PRODUCTION) {
+    console.warn('[seed] 已通过 --force 在生产模式下重建演示数据，请确认这是预期操作。')
+  }
+  const reset = process.argv.includes('--reset') || process.argv.includes('--force')
   const result = seedDatabase({ reset })
   console.log(
     `[seed] 完成：${result.devices} 台设备 / ${result.events} 条事件 / ${result.feedback} 条反馈 / ${result.errors} 条崩溃`,

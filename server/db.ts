@@ -2,9 +2,11 @@ import { DatabaseSync } from 'node:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DATA_DIR_OVERRIDE } from './env.js'
 
 export const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
-export const DATA_DIR = resolve(ROOT, 'data')
+/** 默认 `<repo>/data`，可用 STB_DATA_DIR 覆盖（绝对路径或相对仓库根目录）。 */
+export const DATA_DIR = DATA_DIR_OVERRIDE ? resolve(ROOT, DATA_DIR_OVERRIDE) : resolve(ROOT, 'data')
 export const DB_PATH = resolve(DATA_DIR, 'console.db')
 export const UPLOAD_DIR = resolve(DATA_DIR, 'uploads')
 

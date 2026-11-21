@@ -4,6 +4,9 @@ import staticPlugin from '@fastify/static'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { ROOT, closeDb } from './db.js'
+import { IS_PRODUCTION, logEnvFile } from './env.js'
+import { runMigrations } from './migrate.js'
+import { bootstrapProduction, logBootstrap } from './bootstrap.js'
 import { ensureSeeded } from './seed.js'
 import { authRoutes } from './routes/auth.js'
 import { overviewRoutes } from './routes/overview.js'
@@ -20,6 +23,24 @@ const HOST = process.env.HOST ?? '127.0.0.1'
 const WEB_DIST = resolve(ROOT, 'dist/web')
 
 async function main(): Promise<void> {
+  // 启动信息第一行：说明 .env 的加载结果（只打路径与数量，不打变量值）
+  logEnvFile()
+
+  // 启动流程最前面：幂等迁移（补 device_tool_overrides.reason 列 + 归一化已存配置）
+  const migration = runMigrations()
+  if (
+    migration.addedReasonColumn ||
+    migration.revisionsNormalized > 0 ||
+    migration.draftNormalized ||
+    migration.skipped > 0
+  ) {
+    console.log(
+      `[migrate] 补列 ${migration.addedReasonColumn ? 'device_tool_overrides.reason' : '无'} · ` +
+        `修订归一化 ${migration.revisionsNormalized} 条 · 草稿归一化 ${migration.draftNormalized ? '是' : '否'} · ` +
+        `损坏跳过 ${migration.skipped} 条`,
+    )
+  }
+
   const app = Fastify({
     logger: false,
     trustProxy: true,
@@ -99,16 +120,22 @@ async function main(): Promise<void> {
     await app.register(staticPlugin, { root: WEB_DIST, prefix: '/' })
   }
 
-  const seed = ensureSeeded()
-  if (seed.seeded) {
-    console.log('[boot] 首次启动，已写入学科工具箱演示数据')
-    console.log(`[boot] 演示账号与客户端密钥见 ${seed.credentials}`)
+  if (IS_PRODUCTION) {
+    // 生产模式：不写演示数据，只创建最小可用的管理员 / 配置修订 / 客户端密钥
+    logBootstrap(bootstrapProduction())
+  } else {
+    const seed = ensureSeeded()
+    if (seed.seeded) {
+      console.log('[boot] 首次启动，已写入学科工具箱演示数据')
+      console.log(`[boot] 演示账号与客户端密钥见 ${seed.credentials}`)
+    }
   }
 
   await app.listen({ port: PORT, host: HOST })
   const lines = [
     '',
     '  学科工具箱 · 运营控制台',
+    `  运行模式 ${IS_PRODUCTION ? '生产环境（不播种演示数据）' : '开发 / 演示环境'}`,
     `  控制台   http://${HOST}:${PORT}`,
     `  客户端   http://${HOST}:${PORT}/v1/health`,
     `  前端产物 ${existsSync(WEB_DIST) ? '已托管 dist/web' : '未构建（开发模式请用 Vite）'}`,

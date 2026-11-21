@@ -10,13 +10,14 @@ import {
   TriangleExclamationPoint,
 } from 'lucide-react'
 import { del, put } from '../lib/api'
-import { useAuth, useToast } from '../lib/app-context'
-import { useApi } from '../lib/useApi'
+import { useAuth, useCatalog, useToast } from '../lib/app-context'
+import { useApi, useInterval } from '../lib/useApi'
 import {
   CHANNEL_LABELS,
   DEVICE_STATUS,
   FEEDBACK_STATUS,
   SUBJECT_COLORS,
+  TOOL_KIND_META,
   eventLabel,
   formatDateTime,
   formatDateTimeSeconds,
@@ -33,6 +34,7 @@ import {
   Card,
   CardHeader,
   EmptyState,
+  Input,
   KeyValue,
   Modal,
   Skeleton,
@@ -43,13 +45,17 @@ export function DeviceDetailPage(): React.JSX.Element {
   const { sn = '' } = useParams()
   const navigate = useNavigate()
   const { can } = useAuth()
+  const { toolById } = useCatalog()
   const { toast } = useToast()
   const [updatingTool, setUpdatingTool] = useState<string | null>(null)
+  const [reasonDrafts, setReasonDrafts] = useState<Record<string, string>>({})
   const [clearOpen, setClearOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const { data, loading, error, reload } = useApi<DeviceDetailResponse>(
     `/api/devices/${encodeURIComponent(sn)}`,
   )
+  // 客户端约 60 秒上报一次遥测，页面 30 秒自动刷新一次，单机数据接近实时。
+  useInterval(() => reload(), 30_000)
   const overrides = useApi<DeviceOverrideResponse>(
     can('config.view') ? `/api/devices/${encodeURIComponent(sn)}/overrides` : null,
   )
@@ -67,12 +73,44 @@ export function DeviceDetailPage(): React.JSX.Element {
       await put(`/api/devices/${encodeURIComponent(sn)}/overrides`, {
         toolId: tool.toolId,
         enabled,
+        // 切换开关时保留已填写的停用原因，避免来回拨动丢失文案
+        reason: reasonDrafts[tool.toolId] ?? tool.reason ?? '',
         note: tool.note,
       })
       toast(
         enabled === null
           ? `${tool.title} 已恢复为云端默认`
           : `${tool.title} 已在这台设备上${enabled ? '单独启用' : '单独停用'}`,
+        'success',
+      )
+      overrides.reload()
+      reload()
+    } catch (failure) {
+      toast(failure instanceof Error ? failure.message : '保存失败', 'error')
+    } finally {
+      setUpdatingTool(null)
+    }
+  }
+
+  const saveReason = async (tool: DeviceOverrideTool): Promise<void> => {
+    const reason = (reasonDrafts[tool.toolId] ?? tool.reason ?? '').trim()
+    setUpdatingTool(tool.toolId)
+    try {
+      await put(`/api/devices/${encodeURIComponent(sn)}/overrides`, {
+        toolId: tool.toolId,
+        enabled: false,
+        reason,
+        note: tool.note,
+      })
+      setReasonDrafts((previous) => {
+        const next = { ...previous }
+        delete next[tool.toolId]
+        return next
+      })
+      toast(
+        reason
+          ? `${tool.title} 的本设备停用原因已保存`
+          : `${tool.title} 的本设备停用原因已清空，客户端将回退到全局原因`,
         'success',
       )
       overrides.reload()
@@ -236,14 +274,15 @@ export function DeviceDetailPage(): React.JSX.Element {
             }
           />
           <div className="overflow-x-auto">
-            <table className="table min-w-[900px]">
+            <table className="table min-w-[1120px]">
               <thead>
                 <tr>
                   <th>工具</th>
                   <th>云端默认</th>
                   <th>本设备</th>
                   <th>状态</th>
-                  <th>备注 / 更新</th>
+                  <th className="w-[300px]">停用原因（本设备）</th>
+                  <th className="w-[250px]">内部备注 / 更新</th>
                 </tr>
               </thead>
               <tbody>
@@ -255,9 +294,13 @@ export function DeviceDetailPage(): React.JSX.Element {
                       : tool.overrideEnabled
                         ? { label: '单独启用', tone: 'green' as const }
                         : { label: '单独停用', tone: 'red' as const }
+                  const parentTool = tool.parentId ? toolById.get(tool.parentId) : undefined
+                  const kindMeta = TOOL_KIND_META[tool.kind ?? 'tool'] ?? TOOL_KIND_META.tool!
+                  const reasonDraft = reasonDrafts[tool.toolId] ?? tool.reason ?? ''
+                  const reasonDirty = reasonDraft.trim() !== (tool.reason ?? '')
                   return (
                     <tr key={tool.toolId}>
-                      <td>
+                      <td className="min-w-[240px]">
                         <div className="flex items-center gap-2.5">
                           <span
                             className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px]"
@@ -269,7 +312,17 @@ export function DeviceDetailPage(): React.JSX.Element {
                             {tool.glyph}
                           </span>
                           <div className="min-w-0">
-                            <div className="truncate text-[12.5px] font-medium text-ink">{tool.title}</div>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <div className="truncate text-[12.5px] font-medium text-ink">
+                                {parentTool ? <span className="text-muted">{parentTool.title} › </span> : null}
+                                {tool.title}
+                              </div>
+                              {tool.kind && tool.kind !== 'tool' ? (
+                                <Badge tone={kindMeta.tone} className="shrink-0">
+                                  {kindMeta.label}
+                                </Badge>
+                              ) : null}
+                            </div>
                             <div className="font-mono text-[10px] text-faint">{tool.toolId}</div>
                           </div>
                         </div>
@@ -294,6 +347,43 @@ export function DeviceDetailPage(): React.JSX.Element {
                           {state.label}
                         </Badge>
                       </td>
+                      <td>
+                        {tool.overrideEnabled === false ? (
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              value={reasonDraft}
+                              disabled={!canEdit || updatingTool === tool.toolId}
+                              onChange={(event) =>
+                                setReasonDrafts((previous) => ({
+                                  ...previous,
+                                  [tool.toolId]: event.target.value,
+                                }))
+                              }
+                              placeholder="留空则使用全局停用原因"
+                              title="仅在本设备单独停用时生效；留空则回退到全局停用原因 / 客户端默认文案"
+                              className="h-8 min-w-0 flex-1 text-[11.5px]"
+                              maxLength={120}
+                              aria-label={`${tool.title} 的本设备停用原因`}
+                            />
+                            <Button
+                              variant="outline"
+                              size="xs"
+                              disabled={!canEdit || !reasonDirty || updatingTool === tool.toolId}
+                              loading={updatingTool === tool.toolId}
+                              onClick={() => void saveReason(tool)}
+                            >
+                              保存
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className="max-w-[250px] truncate text-[10.5px] text-faint"
+                            title={tool.disabledReasonGlobal || undefined}
+                          >
+                            {tool.disabledReasonGlobal ? `全局：${tool.disabledReasonGlobal}` : '—'}
+                          </div>
+                        )}
+                      </td>
                       <td className="max-w-[280px]">
                         <div className="truncate text-[11px] text-muted" title={tool.note}>
                           {tool.note || '—'}
@@ -309,7 +399,7 @@ export function DeviceDetailPage(): React.JSX.Element {
                 })}
                 {!overrides.data ? (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       <Skeleton className="h-7 w-full" />
                     </td>
                   </tr>
@@ -317,8 +407,9 @@ export function DeviceDetailPage(): React.JSX.Element {
               </tbody>
             </table>
           </div>
-          <div className="border-t border-line px-5 py-2.5 text-[10.5px] text-faint">
+          <div className="border-t border-line px-5 py-2.5 text-[10.5px] leading-5 text-faint">
             提示：把开关拨回云端默认值即可清除单独控制。设备级设置会写审计日志，但不会随云端草稿发布。
+            「停用原因（本设备）」只在单独停用时可填，客户端优先展示它，留空则回退到全局停用原因。
           </div>
         </Card>
       ) : null}
@@ -569,7 +660,7 @@ export function DeviceDetailPage(): React.JSX.Element {
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         title="该设备的生效配置"
-        description="把设备 SN 带入 /v1/config 后，客户端会收到的完整 JSON（含设备级开关）。"
+        description="把设备 SN 带入 /v1/config 后，客户端会收到的完整 JSON（含设备级开关与停用原因）。"
         size="lg"
         footer={
           <div className="ml-auto flex items-center gap-2">
@@ -599,6 +690,7 @@ export function DeviceDetailPage(): React.JSX.Element {
               <span>·</span>
               <span>{preview.data.deviceOverrides} 项设备级覆盖</span>
             </div>
+            <PreviewDisabledTools preview={preview.data} />
             <pre className="code-block max-h-[54vh]">{JSON.stringify(preview.data.config, null, 2)}</pre>
           </>
         ) : (
@@ -626,6 +718,33 @@ export function DeviceDetailPage(): React.JSX.Element {
           当前有 {overrides.data?.overrideCount ?? 0} 项单独控制。恢复后不会影响其他设备，也不会改变云端全局开关。
         </div>
       </Modal>
+    </div>
+  )
+}
+
+/** 生效配置预览里的停用工具摘要：直观看到客户端会收到哪条停用原因、来自全局还是本设备覆盖 */
+function PreviewDisabledTools({ preview }: { preview: ConfigPreview }): React.JSX.Element | null {
+  const disabled = Object.entries(preview.config.tools).filter(([, state]) => !state.enabled)
+  if (disabled.length === 0) return null
+  return (
+    <div className="mb-2 rounded-xl border border-line bg-surface-2 px-3 py-2">
+      <div className="mb-1 text-[10.5px] font-medium text-faint">停用工具与下发原因</div>
+      <div className="space-y-1">
+        {disabled.map(([toolId, state]) => (
+          <div key={toolId} className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="shrink-0 text-ink">{preview.toolTitles[toolId] ?? toolId}</span>
+            <span
+              className="min-w-0 flex-1 truncate text-right text-muted"
+              title={state.disabledReason ?? ''}
+            >
+              {state.disabledReason || '（客户端默认文案）'}
+            </span>
+            <Badge tone={state.disabledReasonSource === 'device' ? 'amber' : 'neutral'}>
+              {state.disabledReasonSource === 'device' ? '单设备' : '全局'}
+            </Badge>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

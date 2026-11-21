@@ -36,6 +36,15 @@ export const SUBJECTS: Subject[] = [
 
 export const SUBJECT_BY_ID = new Map(SUBJECTS.map((s) => [s.id, s]))
 
+/**
+ * 工具类型：
+ * - `tool`    主工具（主页工具卡片）
+ * - `diagram` 某个主工具（交互示意图）内部的可管控示意图子项
+ * - `feature` 非工具的功能入口（如主页的意见反馈）
+ * 契约约定：`kind` 缺省视为 `tool`，`parentId` 缺省为 `null`。
+ */
+export type ToolKind = 'tool' | 'diagram' | 'feature'
+
 export interface Tool {
   id: string
   subjectId: SubjectId
@@ -44,6 +53,10 @@ export interface Tool {
   glyph: string
   /** 演示流量权重，按 STB 各工具的实际使用频度排序 */
   weight: number
+  /** 缺省为 `tool` */
+  kind?: ToolKind
+  /** 子工具/功能入口归属的主工具 id，缺省为 `null` */
+  parentId?: string | null
 }
 
 export const TOOLS: Tool[] = [
@@ -135,9 +148,46 @@ export const TOOLS: Tool[] = [
     glyph: '公',
     weight: 8,
   },
+  /* ---- 契约第 1 节：纳入后台管控的子工具 / 功能入口（weight 0，排在末尾） ---- */
+  {
+    id: 'biology.diagram.cell-division',
+    subjectId: 'biology',
+    title: '细胞分裂交互图',
+    summary: '有丝分裂 / 减数分裂过程演示',
+    glyph: '裂',
+    weight: 0,
+    kind: 'diagram',
+    parentId: 'biology.diagram',
+  },
+  {
+    id: 'geography.diagram.earth-rotation',
+    subjectId: 'geography',
+    title: '地球自转交互图',
+    summary: '地球自转 · 昼夜交替与线速度',
+    glyph: '转',
+    weight: 0,
+    kind: 'diagram',
+    parentId: 'geography.diagram',
+  },
+  {
+    id: 'other.feedback',
+    subjectId: 'other',
+    title: '意见反馈',
+    summary: '主页右上角反馈入口 · 不发请求也显示',
+    glyph: '反',
+    weight: 0,
+    kind: 'feature',
+    parentId: null,
+  },
 ]
 
 export const TOOL_BY_ID = new Map(TOOLS.map((t) => [t.id, t]))
+
+/**
+ * 主工具：工具排行 / 工具元数据只统计它们。
+ * 工具开关、单设备开关、工具清单同步仍然使用全量 `TOOLS`。
+ */
+export const PRIMARY_TOOLS: Tool[] = TOOLS.filter((tool) => (tool.kind ?? 'tool') === 'tool')
 
 export function toolsOfSubject(subjectId: SubjectId): Tool[] {
   return TOOLS.filter((t) => t.subjectId === subjectId)
