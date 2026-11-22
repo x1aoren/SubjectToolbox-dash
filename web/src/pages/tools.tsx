@@ -19,6 +19,7 @@ import {
   relativeTime,
 } from '../lib/format'
 import type { Overview } from '../lib/types'
+import { ToolBadge } from '../lib/tool-icons'
 import {
   Badge,
   Card,
@@ -199,12 +200,7 @@ export function ToolsPage(): React.JSX.Element {
             >
               <Card className="flex h-full flex-col p-4 transition-colors hover:border-line-strong">
                 <div className="flex items-start gap-2.5">
-                  <span
-                    className="num flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-[14px] font-medium"
-                    style={{ background: `color-mix(in srgb, ${accent} 12%, var(--surface))`, color: accent }}
-                  >
-                    {tool.glyph}
-                  </span>
+                  <ToolBadge icon={tool.icon} glyph={tool.glyph} subjectId={tool.subjectId} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[13.5px] font-semibold text-ink">{tool.title}</span>

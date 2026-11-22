@@ -44,6 +44,8 @@ export interface ToolMeta {
   title: string
   summary: string
   glyph: string
+  /** 与客户端同款 Lucide 图标（kebab-case） */
+  icon: string
   weight?: number
   /** 缺省视为 'tool' */
   kind?: ToolKind
@@ -106,6 +108,7 @@ export interface Overview {
     title: string
     subjectId: string
     glyph: string
+    icon: string
     opens: number
     devices: number
     share: number
@@ -160,6 +163,7 @@ export interface Overview {
     subjectId: string
     summary: string
     glyph: string
+    icon: string
     subject: string
   }>
 }
@@ -593,6 +597,7 @@ export interface DeviceOverrideTool {
   title: string
   subjectId: string
   glyph: string
+  icon: string
   summary: string
   globalEnabled: boolean
   overrideEnabled: boolean | null

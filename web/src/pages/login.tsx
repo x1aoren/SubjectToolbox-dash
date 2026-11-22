@@ -14,6 +14,7 @@ import {
 import { errorMessage, useAuth, useToast } from '../lib/app-context'
 import { SUBJECT_NAMES, SUBJECT_COLORS } from '../lib/format'
 import { Button } from '../components/ui'
+import { BrandMark } from '../components/brand'
 
 const FEATURES = [
   {
@@ -87,9 +88,7 @@ export function LoginPage(): React.JSX.Element {
         <div className="pointer-events-none absolute -bottom-24 right-0 h-[360px] w-[360px] rounded-full bg-[#C8A15E]/15 blur-[110px]" />
 
         <div className="relative flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-[11px] bg-white/12 text-[18px] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur">
-            学
-          </span>
+          <BrandMark size={40} className="ring-1 ring-white/25" />
           <div>
             <div className="text-[14px] font-semibold tracking-wide">学科工具箱</div>
             <div className="text-[10.5px] tracking-[0.16em] text-white/45">SUBJECTTOOLBOX CONSOLE</div>
@@ -152,9 +151,7 @@ export function LoginPage(): React.JSX.Element {
       <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-[368px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-brand text-[16px] font-semibold text-white">
-              学
-            </span>
+            <BrandMark size={36} />
             <div>
               <div className="text-[13px] font-semibold leading-tight text-ink">学科工具箱</div>
               <div className="text-[10.5px] leading-tight text-faint">运营控制台</div>

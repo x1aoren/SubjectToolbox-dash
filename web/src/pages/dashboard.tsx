@@ -30,6 +30,7 @@ import {
   toneStyle,
 } from '../lib/format'
 import type { Overview } from '../lib/types'
+import { ToolBadge } from '../lib/tool-icons'
 import { AreaChart, BarList, Donut, Heatmap, Sparkline } from '../components/charts'
 import {
   Badge,
@@ -422,15 +423,7 @@ export function DashboardPage(): React.JSX.Element {
                   <div key={row.key} className="grid grid-cols-[26px_1fr_52px_48px] items-center gap-2">
                     <span className="num text-[12px] font-medium text-faint">{index + 1}</span>
                     <div className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="num flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px]"
-                        style={{
-                          background: `color-mix(in srgb, ${row.color} 12%, var(--surface))`,
-                          color: row.color,
-                        }}
-                      >
-                        {tool.glyph}
-                      </span>
+                      <ToolBadge icon={tool.icon} glyph={tool.glyph} subjectId={tool.subjectId} size={26} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="truncate text-[12.5px] font-medium text-ink">{tool.title}</span>

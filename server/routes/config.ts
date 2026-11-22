@@ -108,6 +108,7 @@ function overridePayload(sn: string) {
       title: tool.title,
       subjectId: tool.subjectId,
       glyph: tool.glyph,
+      icon: tool.icon,
       summary: tool.summary,
       kind: tool.kind ?? 'tool',
       parentId: tool.parentId ?? null,

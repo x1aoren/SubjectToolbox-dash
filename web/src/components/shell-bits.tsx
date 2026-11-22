@@ -1,14 +1,13 @@
 import { ShieldQuestionMark } from 'lucide-react'
 import { Button, Card } from './ui'
+import { BrandMark } from './brand'
 import { useAuth } from '../lib/app-context'
 
 export function BrandLoader(): React.JSX.Element {
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas">
       <div className="flex flex-col items-center gap-3">
-        <span className="flex h-10 w-10 animate-pulse items-center justify-center rounded-[11px] bg-brand text-[18px] font-semibold text-white">
-          学
-        </span>
+        <BrandMark size={40} className="animate-pulse shadow-[var(--shadow-card)]" />
         <span className="text-[12px] text-muted">正在加载控制台…</span>
       </div>
     </div>

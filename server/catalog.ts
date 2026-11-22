@@ -45,12 +45,34 @@ export const SUBJECT_BY_ID = new Map(SUBJECTS.map((s) => [s.id, s]))
  */
 export type ToolKind = 'tool' | 'diagram' | 'feature'
 
+/**
+ * 工具图标的命名（kebab-case，与 Lucide 官网一致）。
+ *
+ * 客户端 `core/model` 的 `ToolIcon` 枚举 + `core/designsystem` 里的 vector 就是这几个图标，
+ * 两端必须成对出现：客户端换图标时，这里与控制台 `lib/tool-icons.tsx` 的映射一起改。
+ * `mail` 只用于「意见反馈」功能入口（客户端主页用的是 Email 图标）。
+ */
+export type ToolIconName =
+  | 'scroll-text'
+  | 'book-a'
+  | 'square-function'
+  | 'book-open-text'
+  | 'atom'
+  | 'microscope'
+  | 'orbit'
+  | 'library'
+  | 'sigma'
+  | 'mail'
+
 export interface Tool {
   id: string
   subjectId: SubjectId
   title: string
   summary: string
+  /** 单字缩写，图标缺失时的降级显示 */
   glyph: string
+  /** 与客户端同款图标 */
+  icon: ToolIconName
   /** 演示流量权重，按 STB 各工具的实际使用频度排序 */
   weight: number
   /** 缺省为 `tool` */
@@ -66,6 +88,7 @@ export const TOOLS: Tool[] = [
     title: '古诗词',
     summary: '必背篇目 · 注释赏析 · 背诵模式',
     glyph: '诗',
+    icon: 'scroll-text',
     weight: 17,
   },
   {
@@ -74,6 +97,7 @@ export const TOOLS: Tool[] = [
     title: '汉语词典',
     summary: '字词释义 · 拼音检索 · 本地生词本',
     glyph: '典',
+    icon: 'book-a',
     weight: 15,
   },
   {
@@ -82,6 +106,7 @@ export const TOOLS: Tool[] = [
     title: '函数编辑器',
     summary: '多曲线 · 显隐式切换 · 滑块与定义域',
     glyph: '函',
+    icon: 'square-function',
     weight: 13,
   },
   {
@@ -90,6 +115,7 @@ export const TOOLS: Tool[] = [
     title: '词典',
     summary: '英汉释义 · 音标例句 · 本地生词本',
     glyph: '词',
+    icon: 'book-a',
     weight: 15,
   },
   {
@@ -98,6 +124,7 @@ export const TOOLS: Tool[] = [
     title: '语法',
     summary: '薄冰大学英语语法 · 49 篇专题 · 全文检索',
     glyph: '法',
+    icon: 'book-open-text',
     weight: 6,
   },
   {
@@ -106,6 +133,7 @@ export const TOOLS: Tool[] = [
     title: '化学方程式',
     summary: '508 条方程式 · 检索 · 自动配平',
     glyph: '式',
+    icon: 'atom',
     weight: 7,
   },
   {
@@ -114,6 +142,7 @@ export const TOOLS: Tool[] = [
     title: '元素周期表',
     summary: '118 种元素 · 点按查看详情',
     glyph: '表',
+    icon: 'atom',
     weight: 6,
   },
   {
@@ -122,6 +151,7 @@ export const TOOLS: Tool[] = [
     title: '交互示意图',
     summary: '细胞分裂等交互动画',
     glyph: '图',
+    icon: 'microscope',
     weight: 4,
   },
   {
@@ -130,6 +160,7 @@ export const TOOLS: Tool[] = [
     title: '交互示意图',
     summary: '地球自转 · 昼夜交替与线速度',
     glyph: '图',
+    icon: 'orbit',
     weight: 4,
   },
   {
@@ -138,6 +169,7 @@ export const TOOLS: Tool[] = [
     title: '电子教材',
     summary: '人教社官网 · 各科电子课本 · 需联网',
     glyph: '材',
+    icon: 'library',
     weight: 5,
   },
   {
@@ -146,6 +178,7 @@ export const TOOLS: Tool[] = [
     title: '公式大全',
     summary: '281 条公式 · 变量说明 · 万能搜索',
     glyph: '公',
+    icon: 'sigma',
     weight: 8,
   },
   /* ---- 契约第 1 节：纳入后台管控的子工具 / 功能入口（weight 0，排在末尾） ---- */
@@ -155,6 +188,7 @@ export const TOOLS: Tool[] = [
     title: '细胞分裂交互图',
     summary: '有丝分裂 / 减数分裂过程演示',
     glyph: '裂',
+    icon: 'microscope',
     weight: 0,
     kind: 'diagram',
     parentId: 'biology.diagram',
@@ -165,6 +199,7 @@ export const TOOLS: Tool[] = [
     title: '地球自转交互图',
     summary: '地球自转 · 昼夜交替与线速度',
     glyph: '转',
+    icon: 'orbit',
     weight: 0,
     kind: 'diagram',
     parentId: 'geography.diagram',
@@ -175,6 +210,7 @@ export const TOOLS: Tool[] = [
     title: '意见反馈',
     summary: '主页右上角反馈入口 · 不发请求也显示',
     glyph: '反',
+    icon: 'mail',
     weight: 0,
     kind: 'feature',
     parentId: null,

@@ -22,17 +22,7 @@ import { allNavItems, NAV_GROUPS, resolvePage } from '../lib/nav'
 import { auditLabel, formatRelative } from '../lib/format'
 import type { NotificationsResponse } from '../lib/types'
 import { Avatar, Badge, Button, IconButton, cn } from './ui'
-
-function BrandMark({ size = 32 }: { size?: number }): React.JSX.Element {
-  return (
-    <span
-      className="flex shrink-0 items-center justify-center rounded-[9px] bg-brand font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] dark:text-[#0d1512]"
-      style={{ width: size, height: size, fontSize: size * 0.46 }}
-    >
-      学
-    </span>
-  )
-}
+import { BrandMark } from './brand'
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }): React.JSX.Element {
   const { can } = useAuth()
@@ -125,7 +115,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }): React.JSX.
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-[60px] items-center gap-2.5 px-4">
-        <BrandMark />
+        <BrandMark alt="" />
         <div className="min-w-0">
           <div className="truncate text-[13.5px] font-semibold leading-tight tracking-[-0.01em] text-ink">
             学科工具箱

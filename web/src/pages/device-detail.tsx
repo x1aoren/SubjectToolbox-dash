@@ -26,6 +26,7 @@ import {
   relativeTime,
 } from '../lib/format'
 import type { ConfigPreview, DeviceDetailResponse, DeviceOverrideResponse, DeviceOverrideTool } from '../lib/types'
+import { ToolBadge } from '../lib/tool-icons'
 import { AreaChart, BarList } from '../components/charts'
 import {
   Avatar,
@@ -287,7 +288,6 @@ export function DeviceDetailPage(): React.JSX.Element {
               </thead>
               <tbody>
                 {(overrides.data?.tools ?? []).map((tool) => {
-                  const accent = SUBJECT_COLORS[tool.subjectId] ?? 'var(--brand)'
                   const state =
                     tool.overrideEnabled === null
                       ? { label: '跟随云端', tone: 'neutral' as const }
@@ -302,15 +302,7 @@ export function DeviceDetailPage(): React.JSX.Element {
                     <tr key={tool.toolId}>
                       <td className="min-w-[240px]">
                         <div className="flex items-center gap-2.5">
-                          <span
-                            className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px]"
-                            style={{
-                              background: `color-mix(in srgb, ${accent} 12%, var(--surface))`,
-                              color: accent,
-                            }}
-                          >
-                            {tool.glyph}
-                          </span>
+                          <ToolBadge icon={tool.icon} glyph={tool.glyph} subjectId={tool.subjectId} size={28} />
                           <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-1.5">
                               <div className="truncate text-[12.5px] font-medium text-ink">

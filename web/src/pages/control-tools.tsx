@@ -5,11 +5,11 @@ import { useDraftConfig } from '../lib/use-draft'
 import { errorMessage } from '../lib/app-context'
 import {
   CHANNEL_LABELS,
-  SUBJECT_COLORS,
   SUBJECT_NAMES,
   TOOL_KIND_META,
 } from '../lib/format'
 import type { RemoteConfig } from '../lib/types'
+import { ToolBadge } from '../lib/tool-icons'
 import { PublishDialog, SaveBar } from '../components/publish-dialog'
 import {
   Badge,
@@ -147,20 +147,16 @@ export function ControlToolsPage(): React.JSX.Element {
                 const meta = toolById.get(tool.toolId)
                 const parent = meta?.parentId ? toolById.get(meta.parentId) : undefined
                 const kindMeta = TOOL_KIND_META[meta?.kind ?? 'tool'] ?? TOOL_KIND_META.tool!
-                const accent = SUBJECT_COLORS[meta?.subjectId ?? 'other'] ?? 'var(--brand)'
                 return (
                   <tr key={tool.toolId} className={cn(!tool.enabled && 'opacity-60')}>
                     <td>
                       <div className="flex items-center gap-2.5">
-                        <span
-                          className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[12px]"
-                          style={{
-                            background: `color-mix(in srgb, ${accent} 12%, var(--surface))`,
-                            color: accent,
-                          }}
-                        >
-                          {meta?.glyph ?? '·'}
-                        </span>
+                        <ToolBadge
+                          icon={meta?.icon}
+                          glyph={meta?.glyph}
+                          subjectId={meta?.subjectId}
+                          size={28}
+                        />
                         <div className="min-w-0">
                           <div className="flex min-w-0 items-center gap-1.5">
                             <div className="truncate text-[12.5px] font-medium text-ink">

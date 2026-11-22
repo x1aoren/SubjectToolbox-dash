@@ -207,6 +207,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
         title: tool.title,
         subjectId: tool.subjectId,
         glyph: tool.glyph,
+        icon: tool.icon,
         opens,
         devices: num(row?.devices),
         share: totalToolOpens > 0 ? opens / totalToolOpens : 0,
@@ -372,6 +373,7 @@ export async function overviewRoutes(app: FastifyInstance): Promise<void> {
         subjectId: tool.subjectId,
         summary: tool.summary,
         glyph: tool.glyph,
+        icon: tool.icon,
         subject: TOOL_BY_ID.get(tool.id)?.subjectId ?? '',
       })),
     }

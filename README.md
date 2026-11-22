@@ -367,6 +367,7 @@ data/                 SQLite 数据库、上传目录与初始化 / 演示密钥
 ## 与 STB 的关系
 
 - 工具 ID、标题、学科配色、版本号与更新日志与 STB 仓库保持一致；工具目录共 14 项受管控条目（11 个主工具 + `biology.diagram.cell-division` / `geography.diagram.earth-rotation` / `other.feedback`），后台的「工具清单同步」以客户端上报为准；
+- 工具图标同样与客户端对齐：`server/catalog.ts` 的 `icon` 存 Lucide 名（`scroll-text` / `book-a` / `atom` 等），与客户端 `core/designsystem/src/main/res/drawable/ic_tool_*.xml` 是同一批线稿；控制台由 `web/src/lib/tool-icons.tsx` 的 `ToolBadge` 统一渲染（学科淡色底 + 图标），客户端换图标时两边一起改，`glyph` 只作图标缺失时的降级；
 - STB 客户端已接入本服务：SN、会话/工具事件、云端配置、设备级开关（含单设备停用原因）、主页意见反馈与按设备标识查询回复、版本提示；停用的工具/示意图子项/反馈入口在客户端**置灰不隐藏**，点击弹停用原因；客户端侧实现与节流策略见 STB 的 README；
 - 后台里的「成员」是控制台管理员账号，不是学生账号；STB 不提供学生账号体系；
 - 客户端上报使用 `X-STB-Key`（可选）：开发模式默认允许匿名上报，生产模式默认关闭匿名、客户端必须携带密钥（可在控制台或 `STB_ALLOW_ANONYMOUS` 调整）。
